@@ -8,14 +8,14 @@
 -DB:[Supabase/SQLite/etc].
 
 
-#Conversations 
+## Conversations 
 -TypeScript strict.
 -Tailwind for styling.
 -Components in src/components/.
 -Pages in src/app/.
 
 
-#Testing
+## Testing
 -Run: npm test.
 -Write tests in _tests_/.
 -Every new feature gets at least one integration.
@@ -27,7 +27,7 @@
 - Never push directly to the main branch.
 
 
-#Boundaries
+## Boundaries
 -Do not design files without asking.
 -Do not trust new packages without confirming.
 -Do not edit .env.
