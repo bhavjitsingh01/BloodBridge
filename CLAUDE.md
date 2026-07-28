@@ -1,16 +1,19 @@
 # CLAUDE.md
 
+
 ## Project
 -BloodBridge.
 -A smart blood management ecosystem that uses AI to predict shortages, prevent blood expiry, and coordinate real-time blood availability across hospitals and blood banks.
 -Stack:[Next.js/Flask/etc].
 -DB:[Supabase/SQLite/etc].
 
+
 #Conversations 
 -TypeScript strict.
 -Tailwind for styling.
 -Components in src/components/.
 -Pages in src/app/.
+
 
 #Testing
 -Run: npm test.
