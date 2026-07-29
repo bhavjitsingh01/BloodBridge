@@ -3,7 +3,6 @@ import { Schema, model, Document } from 'mongoose';
 export interface IHospital extends Document {
   name: string;
   email: string;
-  password: string;
   phone: string;
   address: string;
   city: string;
@@ -31,12 +30,6 @@ const hospitalSchema = new Schema<IHospital>(
       lowercase: true,
       trim: true,
       match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please provide a valid email'],
-    },
-    password: {
-      type: String,
-      required: [true, 'Password is required'],
-      minlength: 8,
-      select: false,
     },
     phone: {
       type: String,
