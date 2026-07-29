@@ -1,18 +1,9 @@
-import {
-  Heart,
-  Droplets,
-  Building2,
-  AlertTriangle,
-  Brain,
-  Map,
-  BarChart3,
-  LogOut,
-} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 export interface NavLink {
   label: string
   href: string
-  icon: React.ReactNode
+  icon: LucideIcon
   description?: string
 }
 
@@ -22,152 +13,40 @@ export interface RoleNavigation {
   admin?: NavLink[]
 }
 
-export const roleNavigations: Record<string, RoleNavigation> = {
+export const dashboardRoutes = {
   donor: {
-    role: 'Blood Donor',
-    dashboards: [
-      {
-        label: 'Donor Dashboard',
-        href: '/donor',
-        icon: Heart,
-        description: 'Manage your donations',
-      },
-      {
-        label: 'Emergency Coordination',
-        href: '/emergency-coordination',
-        icon: AlertTriangle,
-        description: 'Emergency requests',
-      },
-      {
-        label: 'AI Predictions',
-        href: '/ai-predictions',
-        icon: Brain,
-        description: 'Blood predictions',
-      },
-    ],
+    href: '/donor',
+    label: 'Donor Dashboard',
+    icon: 'Heart',
   },
   hospital: {
-    role: 'Hospital Administrator',
-    dashboards: [
-      {
-        label: 'Hospital Dashboard',
-        href: '/hospital',
-        icon: Building2,
-        description: 'Hospital operations',
-      },
-      {
-        label: 'Emergency Coordination',
-        href: '/emergency-coordination',
-        icon: AlertTriangle,
-        description: 'Emergency requests',
-      },
-      {
-        label: 'AI Predictions',
-        href: '/ai-predictions',
-        icon: Brain,
-        description: 'Blood predictions',
-      },
-    ],
+    href: '/hospital',
+    label: 'Hospital Dashboard',
+    icon: 'Building2',
   },
   bloodBank: {
-    role: 'Blood Bank Manager',
-    dashboards: [
-      {
-        label: 'Blood Bank Dashboard',
-        href: '/blood-bank',
-        icon: Droplets,
-        description: 'Inventory management',
-      },
-      {
-        label: 'Emergency Coordination',
-        href: '/emergency-coordination',
-        icon: AlertTriangle,
-        description: 'Emergency requests',
-      },
-      {
-        label: 'AI Predictions',
-        href: '/ai-predictions',
-        icon: Brain,
-        description: 'Blood predictions',
-      },
-    ],
+    href: '/blood-bank',
+    label: 'Blood Bank Dashboard',
+    icon: 'Droplets',
+  },
+  emergency: {
+    href: '/emergency-coordination',
+    label: 'Emergency Coordination',
+    icon: 'AlertTriangle',
+  },
+  aiPredictions: {
+    href: '/ai-predictions',
+    label: 'AI Predictions',
+    icon: 'Brain',
   },
   admin: {
-    role: 'Administrator',
-    dashboards: [
-      {
-        label: 'Admin Dashboard',
-        href: '/admin',
-        icon: BarChart3,
-        description: 'System overview',
-      },
-      {
-        label: 'Intelligence Map',
-        href: '/intelligence-map',
-        icon: Map,
-        description: 'Regional insights',
-      },
-      {
-        label: 'Emergency Coordination',
-        href: '/emergency-coordination',
-        icon: AlertTriangle,
-        description: 'Emergency requests',
-      },
-      {
-        label: 'AI Predictions',
-        href: '/ai-predictions',
-        icon: Brain,
-        description: 'Blood predictions',
-      },
-    ],
-  },
-}
-
-export function getNavigationForRole(role: 'donor' | 'hospital' | 'bloodBank' | 'admin') {
-  return roleNavigations[role]
-}
-
-export const allDashboards: NavLink[] = [
-  {
-    label: 'Donor Dashboard',
-    href: '/donor',
-    icon: Heart,
-    description: 'Donation management',
-  },
-  {
-    label: 'Hospital Dashboard',
-    href: '/hospital',
-    icon: Building2,
-    description: 'Hospital operations',
-  },
-  {
-    label: 'Blood Bank Dashboard',
-    href: '/blood-bank',
-    icon: Droplets,
-    description: 'Inventory management',
-  },
-  {
-    label: 'Emergency Coordination',
-    href: '/emergency-coordination',
-    icon: AlertTriangle,
-    description: 'Real-time coordination',
-  },
-  {
-    label: 'AI Predictions',
-    href: '/ai-predictions',
-    icon: Brain,
-    description: 'Predictive analytics',
-  },
-  {
-    label: 'Admin Dashboard',
     href: '/admin',
-    icon: BarChart3,
-    description: 'System overview',
+    label: 'Admin Dashboard',
+    icon: 'BarChart3',
   },
-  {
-    label: 'Intelligence Map',
+  map: {
     href: '/intelligence-map',
-    icon: Map,
-    description: 'Regional insights',
+    label: 'Intelligence Map',
+    icon: 'Map',
   },
-]
+}
