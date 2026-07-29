@@ -2,6 +2,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import 'express-async-errors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import mongoose from 'mongoose';
 import { corsConfig } from './middleware/corsConfig';
 import { requestLogger } from './middleware/requestLogger';
 import { errorHandler } from './middleware/errorHandler';
@@ -28,12 +29,22 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 // Request Logger Middleware
 app.use(requestLogger);
 
-// Health Check Route (before other routes)
-app.get('/health', (req: Request, res: Response) => {
+// Root health check endpoint
+app.get('/', (req: Request, res: Response) => {
   res.json({
     success: true,
-    message: 'BloodBridge Server is running',
+    message: 'BloodBridge Backend Running',
+    version: '1.0.0',
     timestamp: new Date().toISOString(),
+  });
+});
+
+// Detailed health check endpoint
+app.get('/api/health', (req: Request, res: Response) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+  res.json({
+    status: 'healthy',
+    database: dbStatus,
     uptime: process.uptime(),
   });
 });
