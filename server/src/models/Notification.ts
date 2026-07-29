@@ -1,69 +1,40 @@
 import { Schema, model, Document, Types } from 'mongoose';
-import { NOTIFICATION_TYPES, NotificationType, NOTIFICATION_PRIORITY, NotificationPriority } from '../config/constants';
 
 export interface INotification extends Document {
-  recipient: Types.ObjectId;
-  type: NotificationType;
+  userId: Types.ObjectId;
   title: string;
   message: string;
-  facility?: Types.ObjectId;
-  bloodGroup?: string;
-  priority: NotificationPriority;
-  read: boolean;
-  actionUrl?: string;
-  metadata?: Record<string, any>;
-  sentAt: Date;
-  readAt?: Date;
+  isRead: boolean;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 const notificationSchema = new Schema<INotification>(
   {
-    recipient: {
+    userId: {
       type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    type: {
-      type: String,
-      enum: NOTIFICATION_TYPES,
-      required: true,
+      required: [true, 'User ID is required'],
     },
     title: {
       type: String,
-      required: true,
+      required: [true, 'Title is required'],
+      trim: true,
     },
     message: {
       type: String,
-      required: true,
+      required: [true, 'Message is required'],
+      trim: true,
     },
-    facility: {
-      type: Schema.Types.ObjectId,
-      ref: 'Hospital',
-    },
-    bloodGroup: String,
-    priority: {
-      type: String,
-      enum: NOTIFICATION_PRIORITY,
-      default: 'normal',
-    },
-    read: {
+    isRead: {
       type: Boolean,
       default: false,
     },
-    actionUrl: String,
-    metadata: Schema.Types.Mixed,
-    sentAt: {
-      type: Date,
-      default: Date.now,
-    },
-    readAt: Date,
   },
   { timestamps: true }
 );
 
 // Indexes
-notificationSchema.index({ recipient: 1, read: 1 });
+notificationSchema.index({ userId: 1, isRead: 1 });
 notificationSchema.index({ createdAt: -1 });
 
 export default model<INotification>('Notification', notificationSchema);
