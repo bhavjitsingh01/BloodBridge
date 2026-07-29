@@ -1,18 +1,58 @@
 'use client'
 
 import Link from 'next/link'
-import { Heart, TrendingUp, Users, Zap, Brain, ArrowRight, Menu, X } from 'lucide-react'
+import { Heart, TrendingUp, Users, Zap, Brain, ArrowRight, Menu, X, AlertCircle, BarChart3 } from 'lucide-react'
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import SectionHeader from '@/components/landing/SectionHeader'
 import FeatureCard from '@/components/landing/FeatureCard'
 import RoleCard from '@/components/landing/RoleCard'
 import StatBadge from '@/components/landing/StatBadge'
 import StepCard from '@/components/landing/StepCard'
 import { landingData } from '@/lib/landingData'
+import { mockAIPredictionData } from '@/lib/mockData'
 import './landing.css'
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  ComposedChart,
+} from 'recharts'
+
+const AccurateIndiaMap = dynamic(() => import('@/components/map/AccurateIndiaMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-80 items-center justify-center">
+      <div className="text-center">
+        <div className="mb-4 inline-block h-10 w-10 animate-spin rounded-full border-4 border-blood-200 border-t-blood-600"></div>
+        <p className="text-gray-600">Loading map...</p>
+      </div>
+    </div>
+  ),
+})
+
+const EnhancedStatePanel = dynamic(() => import('@/components/map/EnhancedStatePanel'), {
+  ssr: false,
+})
 
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [selectedState, setSelectedState] = useState<string | null>(null)
+  const [mapLoading, setMapLoading] = useState(false)
+  const { bloodShortagePrediction, demandPrediction, supplyVsDemand } = mockAIPredictionData
+
+  const handleStateSelect = (state: string) => {
+    setMapLoading(true)
+    setSelectedState(state)
+    setTimeout(() => setMapLoading(false), 300)
+  }
 
   return (
     <main className="bg-white">
@@ -187,6 +227,129 @@ export default function Home() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* AI Predictions Section */}
+      <section className="bg-gray-50 px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <SectionHeader
+            title="Live AI Predictions"
+            subtitle="Real-time forecasting powered by machine learning algorithms"
+          />
+
+          {/* Blood Shortage Prediction */}
+          <div className="mb-8 animate-fade-in-up rounded-lg border border-gray-200 bg-white p-6">
+            <div className="mb-6 flex items-center gap-2">
+              <AlertCircle className="h-6 w-6 text-red-600" />
+              <h3 className="text-lg font-semibold text-gray-900">Blood Shortage Prediction</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={bloodShortagePrediction}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="bloodGroup" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="currentUnits" fill="#3b82f6" name="Current Units" />
+                  <Bar dataKey="minRequired" fill="#ef4444" name="Min Required" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Demand Prediction */}
+          <div className="mb-8 animate-fade-in-up rounded-lg border border-gray-200 bg-white p-6">
+            <div className="mb-6 flex items-center gap-2">
+              <TrendingUp className="h-6 w-6 text-blue-600" />
+              <h3 className="text-lg font-semibold text-gray-900">7-Day Demand Forecast</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={demandPrediction}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="O_positive" stroke="#dc2626" name="O+" strokeWidth={2} />
+                  <Line type="monotone" dataKey="A_positive" stroke="#2563eb" name="A+" strokeWidth={2} />
+                  <Line type="monotone" dataKey="B_positive" stroke="#059669" name="B+" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Supply vs Demand */}
+          <div className="animate-fade-in-up rounded-lg border border-gray-200 bg-white p-6">
+            <div className="mb-6 flex items-center gap-2">
+              <BarChart3 className="h-6 w-6 text-green-600" />
+              <h3 className="text-lg font-semibold text-gray-900">Supply vs Demand Analysis</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <ResponsiveContainer width="100%" height={300}>
+                <ComposedChart data={supplyVsDemand}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="bloodGroup" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="supply" fill="#10b981" name="Supply" />
+                  <Bar dataKey="demand" fill="#f59e0b" name="Demand" />
+                  <Line type="monotone" dataKey="balance" stroke="#3b82f6" name="Balance" strokeWidth={2} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Intelligence Map Section */}
+      <section className="px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <SectionHeader
+            title="Blood Intelligence Map"
+            subtitle="Real-time geographical tracking of blood supply across India"
+          />
+
+          <div className="animate-fade-in-up rounded-lg border border-gray-200 bg-white p-6">
+            <div className="flex flex-col gap-6 lg:flex-row">
+              {/* Map Container */}
+              <div className="flex-1 rounded-lg border border-gray-200 bg-gray-50" style={{ minHeight: '600px' }}>
+                <AccurateIndiaMap selectedState={selectedState} onStateSelect={handleStateSelect} />
+              </div>
+
+              {/* State Info Panel */}
+              <div className="w-full rounded-lg border border-gray-200 bg-white p-6 lg:w-96">
+                {selectedState ? (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">{selectedState}</h3>
+                    <p className="mt-2 text-sm text-gray-600">Blood Supply Status</p>
+                    <div className="mt-6 space-y-4">
+                      <div className="rounded-lg border border-gray-200 p-4">
+                        <p className="text-sm text-gray-600">Available Units</p>
+                        <p className="mt-1 text-2xl font-bold text-blood-600">12,450</p>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 p-4">
+                        <p className="text-sm text-gray-600">Critical Types</p>
+                        <p className="mt-1 text-lg font-semibold text-red-600">O+, B-</p>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 p-4">
+                        <p className="text-sm text-gray-600">Inventory Health</p>
+                        <p className="mt-1 text-lg font-semibold text-green-600">72% Optimal</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center">
+                    <Heart className="mb-4 h-12 w-12 text-gray-300" />
+                    <p className="text-gray-500">Select a state on the map to view details</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </section>
