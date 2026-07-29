@@ -54,14 +54,14 @@ export default function IntelligenceMapPage() {
       </header>
 
       {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden gap-0">
         {/* Left Side - Accurate Geographic Map */}
-        <div className="flex-1 overflow-hidden border-r border-gray-200 bg-white">
+        <div className="flex-1 overflow-auto border-r border-gray-200 bg-white">
           <AccurateIndiaMap selectedState={selectedState} onStateSelect={handleStateSelect} />
         </div>
 
         {/* Right Side - Analytics Panel */}
-        <div className="w-full overflow-hidden md:w-96 lg:w-[450px] bg-white">
+        <div className="w-full overflow-auto md:w-96 lg:w-[450px] bg-white border-l border-gray-200">
           <EnhancedStatePanel state={selectedStateData} loading={loading} />
         </div>
       </div>

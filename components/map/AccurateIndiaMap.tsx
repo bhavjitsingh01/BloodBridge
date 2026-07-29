@@ -52,8 +52,9 @@ export default function AccurateIndiaMap({
   return (
     <div className="flex flex-col h-full bg-white">
       {/* SVG Map - GADM Data */}
-      <div className="flex-1 overflow-auto flex items-center justify-center p-2">
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{ maxWidth: '100%' }}>
+      <div className="flex-1 overflow-auto p-4 bg-gradient-to-b from-blue-50 to-blue-100">
+        <div className="inline-block min-w-full">
+          <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{ minWidth: '100%', minHeight: '100%' }}>
           {/* Filters */}
           <defs>
             <filter id="shadow">
@@ -157,6 +158,7 @@ export default function AccurateIndiaMap({
             ))}
           </g>
         </svg>
+        </div>
       </div>
 
       {/* State selection grid */}
