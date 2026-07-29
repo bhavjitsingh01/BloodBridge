@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic'
 import EnhancedStatePanel from '@/components/map/EnhancedStatePanel'
 import { getStateData } from '@/lib/indiaMapData'
 
-const RealIndiaMap = dynamic(() => import('@/components/map/RealIndiaMap'), {
+const AccurateIndiaMap = dynamic(() => import('@/components/map/AccurateIndiaMap'), {
   ssr: false,
   loading: () => (
     <div className="flex h-full items-center justify-center">
@@ -55,9 +55,9 @@ export default function IntelligenceMapPage() {
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Side - Real Geographic Map */}
+        {/* Left Side - Accurate Geographic Map */}
         <div className="flex-1 overflow-hidden border-r border-gray-200 bg-white">
-          <RealIndiaMap selectedState={selectedState} onStateSelect={handleStateSelect} />
+          <AccurateIndiaMap selectedState={selectedState} onStateSelect={handleStateSelect} />
         </div>
 
         {/* Right Side - Analytics Panel */}
