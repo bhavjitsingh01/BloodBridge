@@ -6,6 +6,7 @@ export interface IEmergencyRequest extends Document {
   bloodGroup: string;
   unitsRequired: number;
   priority: 'Normal' | 'High' | 'Critical';
+  requiredBefore: Date;
   status: 'Pending' | 'Accepted' | 'Completed' | 'Cancelled';
   createdAt: Date;
   updatedAt: Date;
@@ -21,12 +22,18 @@ const emergencyRequestSchema = new Schema<IEmergencyRequest>(
     requesterType: {
       type: String,
       required: [true, 'Requester type is required'],
-      enum: ['Hospital', 'BloodBank'],
+      enum: {
+        values: ['Hospital', 'BloodBank'],
+        message: 'Requester type must be Hospital or BloodBank',
+      },
     },
     bloodGroup: {
       type: String,
       required: [true, 'Blood group is required'],
-      enum: ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'],
+      enum: {
+        values: ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'],
+        message: 'Invalid blood group',
+      },
     },
     unitsRequired: {
       type: Number,
@@ -36,23 +43,39 @@ const emergencyRequestSchema = new Schema<IEmergencyRequest>(
     priority: {
       type: String,
       required: [true, 'Priority is required'],
-      enum: ['Normal', 'High', 'Critical'],
+      enum: {
+        values: ['Normal', 'High', 'Critical'],
+        message: 'Priority must be Normal, High, or Critical',
+      },
       default: 'Normal',
+    },
+    requiredBefore: {
+      type: Date,
+      required: [true, 'Required before date is required'],
+      validate: {
+        validator: (v: Date) => v > new Date(),
+        message: 'Required before date must be in the future',
+      },
     },
     status: {
       type: String,
       required: [true, 'Status is required'],
-      enum: ['Pending', 'Accepted', 'Completed', 'Cancelled'],
+      enum: {
+        values: ['Pending', 'Accepted', 'Completed', 'Cancelled'],
+        message: 'Status must be Pending, Accepted, Completed, or Cancelled',
+      },
       default: 'Pending',
     },
   },
   { timestamps: true }
 );
 
-// Indexes
+// Indexes for efficient queries
 emergencyRequestSchema.index({ status: 1 });
 emergencyRequestSchema.index({ priority: 1 });
 emergencyRequestSchema.index({ requesterId: 1 });
 emergencyRequestSchema.index({ createdAt: -1 });
+emergencyRequestSchema.index({ requiredBefore: 1 });
+emergencyRequestSchema.index({ bloodGroup: 1, status: 1 });
 
 export default model<IEmergencyRequest>('EmergencyRequest', emergencyRequestSchema);
