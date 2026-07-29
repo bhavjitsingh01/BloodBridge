@@ -6,6 +6,7 @@ import bloodBankRoutes from './blood-bank.routes';
 import donorRoutes from './donor.routes';
 import bloodInventoryRoutes from './blood-inventory.routes';
 import emergencyRoutes from './emergency.routes';
+import aiRoutes from './ai.routes';
 
 const router = Router();
 
@@ -26,6 +27,9 @@ router.use(`${API_PREFIX}/inventory`, bloodInventoryRoutes);
 
 // Emergency routes
 router.use(`${API_PREFIX}/emergency`, emergencyRoutes);
+
+// AI routes
+router.use(`${API_PREFIX}/ai`, aiRoutes);
 
 // Health check endpoint
 router.get(`${API_PREFIX}/health`, (req, res) => {
