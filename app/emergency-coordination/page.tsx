@@ -6,6 +6,7 @@ import Card from '@/components/Card'
 import Badge from '@/components/Badge'
 import Button from '@/components/Button'
 import { mockEmergencyCoordinationData } from '@/lib/mockData'
+import { formatTime } from '@/lib/dateUtils'
 
 const navItems = [
   { label: 'Dashboard', href: '/emergency-coordination', icon: <AlertTriangle className="h-5 w-5" />, isActive: true },
@@ -83,7 +84,7 @@ export default function EmergencyCoordinationPage() {
                     <div>Condition: {request.condition}</div>
                   </div>
                   <div className="mt-3 text-xs text-gray-500">
-                    Requested at {new Date(request.createdAt).toLocaleTimeString()}
+                    Requested at {formatTime(request.createdAt)}
                   </div>
                 </div>
                 <Button size="sm" className="ml-4 flex-shrink-0">
