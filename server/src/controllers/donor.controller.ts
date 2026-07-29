@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import Donor from '../models/Donor';
+import { getSocketService } from '../services/socket.service';
 import logger from '../utils/logger';
 
 interface AuthRequest extends Request {
@@ -98,6 +99,20 @@ export const createDonor = async (req: AuthRequest, res: Response): Promise<void
 
     await donor.save();
     logger.info(`Donor created: ${email}`);
+
+    // Emit socket event for new donor available
+    try {
+      const socketService = getSocketService();
+      socketService.emitNewDonorAvailable(
+        donor._id.toString(),
+        bloodGroup,
+        fullName,
+        city,
+        state
+      );
+    } catch (socketError) {
+      logger.error('Error emitting socket event:', socketError);
+    }
 
     res.status(201).json({
       success: true,
@@ -319,6 +334,21 @@ export const updateDonorAvailability = async (req: AuthRequest, res: Response): 
     donor.availabilityStatus = availabilityStatus;
     await donor.save();
     logger.info(`Donor availability updated: ${id} - ${availabilityStatus}`);
+
+    // Emit socket event for donor availability change
+    try {
+      const socketService = getSocketService();
+      socketService.emitDonorAvailabilityChanged(
+        donor._id.toString(),
+        donor.bloodGroup,
+        donor.fullName,
+        availabilityStatus as 'Available' | 'Unavailable',
+        donor.city,
+        donor.state
+      );
+    } catch (socketError) {
+      logger.error('Error emitting socket event:', socketError);
+    }
 
     res.status(200).json({
       success: true,

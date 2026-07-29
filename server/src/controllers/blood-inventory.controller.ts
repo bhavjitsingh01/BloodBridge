@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import BloodInventory from '../models/BloodInventory';
 import Hospital from '../models/Hospital';
+import BloodBank from '../models/BloodBank';
+import { getSocketService } from '../services/socket.service';
 import logger from '../utils/logger';
 
 interface AuthRequest extends Request {
@@ -84,6 +86,21 @@ export const createInventory = async (req: AuthRequest, res: Response): Promise<
 
     await inventory.save();
     logger.info(`Blood inventory created: ${bloodGroup} - ${units} units`);
+
+    // Emit socket event for inventory update
+    try {
+      const socketService = getSocketService();
+      socketService.emitBloodInventoryUpdated(
+        hospitalId,
+        'Hospital',
+        bloodGroup,
+        units,
+        hospital.city,
+        hospital.state
+      );
+    } catch (socketError) {
+      logger.error('Error emitting socket event:', socketError);
+    }
 
     res.status(201).json({
       success: true,
@@ -236,6 +253,39 @@ export const updateInventory = async (req: AuthRequest, res: Response): Promise<
     inventory.lastUpdated = new Date();
     await inventory.save();
     logger.info(`Inventory updated: ${id}`);
+
+    // Emit socket events for inventory update
+    try {
+      const socketService = getSocketService();
+      const location = await Hospital.findById(inventory.hospitalId);
+
+      if (location) {
+        socketService.emitBloodInventoryUpdated(
+          inventory.hospitalId.toString(),
+          'Hospital',
+          inventory.bloodGroup,
+          inventory.units,
+          location.city,
+          location.state
+        );
+
+        // Check if inventory is running low
+        const minimumRequired = 20; // Configurable threshold
+        if (inventory.units < minimumRequired && inventory.units > 0) {
+          socketService.emitBloodInventoryLow(
+            inventory.hospitalId.toString(),
+            'Hospital',
+            inventory.bloodGroup,
+            inventory.units,
+            minimumRequired,
+            location.city,
+            location.state
+          );
+        }
+      }
+    } catch (socketError) {
+      logger.error('Error emitting socket event:', socketError);
+    }
 
     res.status(200).json({
       success: true,

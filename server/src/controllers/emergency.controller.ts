@@ -3,6 +3,8 @@ import EmergencyRequest from '../models/EmergencyRequest';
 import Hospital from '../models/Hospital';
 import BloodBank from '../models/BloodBank';
 import matchingService from '../services/matching.service';
+import notificationService from '../services/notification.service';
+import { getSocketService } from '../services/socket.service';
 import logger from '../utils/logger';
 
 interface AuthRequest extends Request {
@@ -119,6 +121,31 @@ export const createEmergencyRequest = async (req: AuthRequest, res: Response): P
     await emergencyRequest.save();
     logger.info(`Emergency request created: ${bloodGroup} - ${unitsRequired} units - Priority: ${priority}`);
 
+    // Emit socket event for emergency request created
+    try {
+      const socketService = getSocketService();
+      socketService.emitEmergencyRequestCreated(
+        bloodGroup,
+        unitsRequired,
+        priority,
+        requester.city,
+        requester.state,
+        requester.name,
+        emergencyRequest._id.toString()
+      );
+
+      // Notify eligible donors
+      await notificationService.notifyDonorsForEmergency(
+        emergencyRequest._id.toString(),
+        bloodGroup,
+        unitsRequired,
+        requester.location.coordinates,
+        priority
+      );
+    } catch (socketError) {
+      logger.error('Error emitting socket event:', socketError);
+    }
+
     res.status(201).json({
       success: true,
       message: 'Emergency request created successfully',
@@ -230,7 +257,7 @@ export const updateEmergencyStatus = async (req: AuthRequest, res: Response): Pr
       id,
       { status },
       { new: true, runValidators: true }
-    );
+    ).populate('requesterId', 'name email city state');
 
     if (!emergencyRequest) {
       res.status(404).json({
@@ -241,6 +268,29 @@ export const updateEmergencyStatus = async (req: AuthRequest, res: Response): Pr
     }
 
     logger.info(`Emergency request status updated: ${id} - Status: ${status}`);
+
+    // Emit socket events based on status change
+    try {
+      const socketService = getSocketService();
+      if (status === 'Accepted') {
+        const requester: any = emergencyRequest.requesterId;
+        socketService.emitEmergencyRequestAccepted(
+          emergencyRequest._id.toString(),
+          requester.name
+        );
+      } else if (status === 'Completed') {
+        socketService.emitEmergencyRequestCompleted(
+          emergencyRequest._id.toString(),
+          {
+            bloodGroup: emergencyRequest.bloodGroup,
+            unitsRequired: emergencyRequest.unitsRequired,
+            completedAt: new Date(),
+          }
+        );
+      }
+    } catch (socketError) {
+      logger.error('Error emitting socket event:', socketError);
+    }
 
     res.status(200).json({
       success: true,
