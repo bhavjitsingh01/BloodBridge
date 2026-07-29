@@ -1,5 +1,7 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import 'express-async-errors';
+import helmet from 'helmet';
+import morgan from 'morgan';
 import { corsConfig } from './middleware/corsConfig';
 import { requestLogger } from './middleware/requestLogger';
 import { errorHandler } from './middleware/errorHandler';
@@ -9,6 +11,12 @@ const app: Express = express();
 
 // Trust proxy
 app.set('trust proxy', 1);
+
+// Security Middleware
+app.use(helmet());
+
+// HTTP Logger Middleware
+app.use(morgan('combined'));
 
 // CORS Configuration
 app.use(corsConfig);
