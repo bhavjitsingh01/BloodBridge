@@ -228,6 +228,131 @@ export default function Home() {
         </div>
       </section>
 
+      {/* AI Predictions Preview Section */}
+      <section className="px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <SectionHeader
+            title="AI Prediction Dashboard"
+            subtitle="Real-time analytics and forecasting for intelligent decision-making"
+          />
+
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+            <div className="animate-fade-in-up rounded-lg border border-blue-200 bg-blue-50 p-6 text-center" style={{ animationDelay: '0s' }}>
+              <div className="mb-4 flex justify-center">
+                <TrendingUp className="h-8 w-8 text-blue-600" />
+              </div>
+              <h3 className="font-bold text-gray-900">Blood Shortage Prediction</h3>
+              <p className="mt-2 text-sm text-gray-600">Predict critical blood shortages before they happen with AI-driven analytics</p>
+              <Link href="/ai-predictions" className="mt-4 inline-block text-blue-600 font-semibold hover:text-blue-700">
+                View Dashboard →
+              </Link>
+            </div>
+
+            <div className="animate-fade-in-up rounded-lg border border-green-200 bg-green-50 p-6 text-center" style={{ animationDelay: '0.1s' }}>
+              <div className="mb-4 flex justify-center">
+                <Brain className="h-8 w-8 text-green-600" />
+              </div>
+              <h3 className="font-bold text-gray-900">Demand Prediction</h3>
+              <p className="mt-2 text-sm text-gray-600">7-day demand forecasts across all blood types with machine learning</p>
+              <Link href="/ai-predictions" className="mt-4 inline-block text-green-600 font-semibold hover:text-green-700">
+                View Dashboard →
+              </Link>
+            </div>
+
+            <div className="animate-fade-in-up rounded-lg border border-amber-200 bg-amber-50 p-6 text-center" style={{ animationDelay: '0.2s' }}>
+              <div className="mb-4 flex justify-center">
+                <TrendingUp className="h-8 w-8 text-amber-600" />
+              </div>
+              <h3 className="font-bold text-gray-900">Expiry Prediction</h3>
+              <p className="mt-2 text-sm text-gray-600">Minimize blood waste with proactive expiry tracking and alerts</p>
+              <Link href="/ai-predictions" className="mt-4 inline-block text-amber-600 font-semibold hover:text-amber-700">
+                View Dashboard →
+              </Link>
+            </div>
+
+            <div className="animate-fade-in-up rounded-lg border border-purple-200 bg-purple-50 p-6 text-center" style={{ animationDelay: '0.3s' }}>
+              <div className="mb-4 flex justify-center">
+                <TrendingUp className="h-8 w-8 text-purple-600" />
+              </div>
+              <h3 className="font-bold text-gray-900">Supply vs Demand</h3>
+              <p className="mt-2 text-sm text-gray-600">Real-time balance analysis between supply and demand across regions</p>
+              <Link href="/ai-predictions" className="mt-4 inline-block text-purple-600 font-semibold hover:text-purple-700">
+                View Dashboard →
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-12 text-center">
+            <Link
+              href="/ai-predictions"
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-8 py-4 font-semibold text-white transition-all hover:bg-blue-700 hover:shadow-lg"
+            >
+              Explore AI Predictions
+              <ArrowRight className="h-5 w-5" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Intelligence Map Preview Section */}
+      <section className="gradient-bg px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <SectionHeader
+            title="Intelligence Map"
+            subtitle="Geographic visualization of blood supply across your region"
+          />
+
+          <div className="grid gap-8 md:grid-cols-2">
+            <div className="animate-fade-in-up rounded-lg border border-gray-200 bg-white p-8" style={{ animationDelay: '0s' }}>
+              <div className="space-y-4">
+                <h3 className="text-2xl font-bold text-gray-900">Real-Time Regional Analytics</h3>
+                <ul className="space-y-3 text-gray-600">
+                  <li className="flex items-start gap-3">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-blood-600 flex-shrink-0"></span>
+                    <span>View blood availability across all hospitals and blood banks</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-blood-600 flex-shrink-0"></span>
+                    <span>Track inventory levels with color-coded risk indicators</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-blood-600 flex-shrink-0"></span>
+                    <span>Identify critical shortage areas and response priorities</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-blood-600 flex-shrink-0"></span>
+                    <span>GADM administrative boundaries for accurate regional mapping</span>
+                  </li>
+                </ul>
+
+                <Link
+                  href="/intelligence-map"
+                  className="mt-6 inline-flex items-center gap-2 rounded-lg bg-blood-600 px-6 py-3 font-semibold text-white transition-all hover:bg-blood-700"
+                >
+                  View Live Map
+                  <ArrowRight className="h-5 w-5" />
+                </Link>
+              </div>
+            </div>
+
+            <div className="animate-fade-in-up rounded-lg border border-gray-200 bg-white p-8" style={{ animationDelay: '0.1s' }}>
+              <div className="rounded-lg bg-gradient-to-br from-blue-50 to-blood-50 aspect-square flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-6xl mb-4">🗺️</div>
+                  <h4 className="text-xl font-bold text-gray-900">GADM Intelligence Map</h4>
+                  <p className="mt-2 text-gray-600">Geographic coverage with administrative boundaries</p>
+                  <div className="mt-6 flex flex-wrap justify-center gap-2">
+                    <span className="inline-block rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800">Sufficient</span>
+                    <span className="inline-block rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800">Low</span>
+                    <span className="inline-block rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-800">Critical</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* User Roles Section */}
       <section id="roles" className="bg-gray-50 px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
