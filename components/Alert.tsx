@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { AlertCircle, CheckCircle, AlertTriangle, Info, X } from 'lucide-react'
 
-type Type = 'success' | 'error' | 'warning' | 'info'
+type Type = 'success' | 'error' | 'warning' | 'info' | 'danger'
 
 interface AlertProps {
   type: Type
@@ -42,6 +42,14 @@ const styles = {
     iconColor: 'text-blue-600',
     title: 'text-blue-900',
     message: 'text-blue-800',
+  },
+  danger: {
+    bg: 'bg-red-50',
+    border: 'border-red-200',
+    icon: AlertCircle,
+    iconColor: 'text-red-600',
+    title: 'text-red-900',
+    message: 'text-red-800',
   },
 }
 
