@@ -3,9 +3,12 @@ import 'express-async-errors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import mongoose from 'mongoose';
+import swaggerUi from 'swagger-ui-express';
 import { corsConfig } from './middleware/corsConfig';
 import { requestLogger } from './middleware/requestLogger';
 import { errorHandler } from './middleware/errorHandler';
+import { setupSecurityMiddleware } from './middleware/securityMiddleware';
+import { swaggerSpec } from './config/swagger';
 import routes from './routes/index';
 
 const app: Express = express();
@@ -47,6 +50,20 @@ app.get('/api/health', (req: Request, res: Response) => {
     database: dbStatus,
     uptime: process.uptime(),
   });
+});
+
+// Swagger Documentation
+app.use('/api-docs', swaggerUi.serve);
+app.get('/api-docs', swaggerUi.setup(swaggerSpec, {
+  swaggerOptions: {
+    url: '/api-docs.json',
+  },
+}));
+
+// Swagger JSON endpoint
+app.get('/api-docs.json', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
 });
 
 // API Routes

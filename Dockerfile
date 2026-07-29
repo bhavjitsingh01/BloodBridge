@@ -12,8 +12,8 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build TypeScript (optional - we use ts-node for development)
-RUN npm run build 2>/dev/null || echo "No build script defined"
+# Build Next.js application
+RUN npm run build
 
 # Production stage
 FROM node:18-alpine
@@ -29,13 +29,10 @@ COPY package*.json ./
 # Install only production dependencies
 RUN npm ci --only=production
 
-# Copy source code and compiled code from builder
-COPY --from=builder /app/dist ./dist 2>/dev/null || true
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/tsconfig.json ./tsconfig.json 2>/dev/null || true
-
-# Create logs directory
-RUN mkdir -p logs
+# Copy built application from builder
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.js ./next.config.js
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -45,14 +42,14 @@ RUN addgroup -g 1001 -S nodejs && \
 USER nodejs
 
 # Expose port
-EXPOSE 5001
+EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:5001/api/v1/health || exit 1
+  CMD curl -f http://localhost:3000 || exit 1
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start the application
-CMD ["node", "-r", "dotenv/config", "dist/server.js"]
+CMD ["npm", "start"]
