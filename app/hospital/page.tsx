@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Droplet, AlertCircle, Navigation, Zap, Send, AlertTriangle, TrendingUp, MapPin, Clock } from 'lucide-react'
+import { Droplet, AlertCircle, Navigation, Zap, Send, AlertTriangle, TrendingUp, MapPin, Clock, Loader } from 'lucide-react'
 import DashboardLayout from '@/components/DashboardLayout'
 import StatCard from '@/components/StatCard'
 import Card from '@/components/Card'
@@ -9,7 +9,8 @@ import Table from '@/components/Table'
 import Badge from '@/components/Badge'
 import Alert from '@/components/Alert'
 import Button from '@/components/Button'
-import { mockHospitalData } from '@/lib/mockData'
+import { useHospitalDashboardData } from '@/lib/useDashboardData'
+import { useAuth } from '@/lib/useAuth'
 
 const navItems = [
   { label: 'Dashboard', href: '/hospital', icon: <Droplet className="h-5 w-5" />, isActive: true },
@@ -18,62 +19,53 @@ const navItems = [
   { label: 'Analytics', href: '/hospital/analytics', icon: <Navigation className="h-5 w-5" /> },
 ]
 
-const AI_RECOMMENDATIONS = [
-  {
-    id: 1,
-    title: 'Transfer O+ Blood to Apollo Hospital',
-    reason: 'Apollo Hospital is critically low on O+ blood with projected shortage in 12 hours',
-    action: 'Transfer 10 units',
-    urgency: 'critical',
-    confidence: 98,
-  },
-  {
-    id: 2,
-    title: 'Restock B- Blood from Nearest Bank',
-    reason: 'B- inventory is moderate but predictive model shows 25% demand increase tomorrow',
-    action: 'Request 15 units',
-    urgency: 'high',
-    confidence: 87,
-  },
-  {
-    id: 3,
-    title: 'Optimize A+ Distribution',
-    reason: 'Three nearby hospitals combined can fulfill your current A+ demand efficiently',
-    action: 'Coordinate transfer',
-    urgency: 'medium',
-    confidence: 92,
-  },
-]
-
-const EMERGENCY_REQUESTS_MOCK = [
-  {
-    id: 'emerg-001',
-    bloodGroup: 'O-',
-    units: 10,
-    status: 'critical',
-    eta: '30 minutes',
-    hospital: 'Max Healthcare',
-    priority: 'Critical',
-  },
-  {
-    id: 'emerg-002',
-    bloodGroup: 'AB+',
-    units: 5,
-    status: 'urgent',
-    eta: '1 hour',
-    hospital: 'Dr. Mehta Clinic',
-    priority: 'High',
-  },
-]
-
 export default function HospitalDashboard() {
-  const { profile, inventory, bloodRequests, nearbyBloodBanks } = mockHospitalData
+  const { user } = useAuth()
+  const { data, loading, error, refetch } = useHospitalDashboardData()
   const [requestForm, setRequestForm] = useState({ bloodGroup: 'O+', units: 5, priority: 'Normal' })
   const [showRequestForm, setShowRequestForm] = useState(false)
 
-  const totalInventory = inventory.reduce((sum, inv) => sum + inv.available, 0)
-  const totalReserved = inventory.reduce((sum, inv) => sum + inv.reserved, 0)
-  const totalExpiring = inventory.reduce((sum, inv) => sum + inv.expiring, 0)
+  if (loading) {
+    return (
+      <DashboardLayout
+        title="Hospital Blood Management"
+        subtitle="Loading dashboard..."
+        userRole="Hospital Admin"
+        navItems={navItems}
+      >
+        <div className="flex justify-center items-center py-12">
+          <Loader className="h-8 w-8 animate-spin text-blood-600" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout
+        title="Hospital Blood Management"
+        subtitle="Error loading dashboard"
+        userRole="Hospital Admin"
+        navItems={navItems}
+      >
+        <Alert
+          type="danger"
+          title="Failed to load dashboard"
+          message={error}
+          className="mb-6"
+        />
+      </DashboardLayout>
+    )
+  }
+
+  const inventory = data?.inventory || []
+  const emergencyRequests = data?.emergencyRequests || []
+  const nearbyBloodBanks = data?.nearbyBloodBanks || []
+  const recommendations = data?.recommendations?.recommendations || []
+
+  const totalInventory = inventory.reduce((sum, inv) => sum + (inv.available || 0), 0)
+  const totalReserved = inventory.reduce((sum, inv) => sum + (inv.reserved || 0), 0)
+  const totalExpiring = inventory.reduce((sum, inv) => sum + (inv.expiring || 0), 0)
 
   const handleRequestSubmit = () => {
     setShowRequestForm(false)
@@ -83,7 +75,7 @@ export default function HospitalDashboard() {
   return (
     <DashboardLayout
       title="Hospital Blood Management"
-      subtitle={`${profile.name} - Real-time blood inventory and request management`}
+      subtitle={`${user?.name || 'Hospital'} - Real-time blood inventory and request management`}
       userRole="Hospital Admin"
       navItems={navItems}
     >
@@ -224,34 +216,38 @@ export default function HospitalDashboard() {
       <Card className="mb-8">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">🚨 Emergency Requests In Progress</h2>
         <div className="space-y-3">
-          {EMERGENCY_REQUESTS_MOCK.map((req) => (
-            <div key={req.id} className="rounded-lg border-l-4 border-l-red-600 bg-red-50 p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-gray-900">{req.bloodGroup} Blood Needed</p>
-                    <Badge variant="danger">{req.units} units</Badge>
+          {emergencyRequests.length === 0 ? (
+            <p className="text-gray-600">No emergency requests in progress</p>
+          ) : (
+            emergencyRequests.map((req: any) => (
+              <div key={req._id || req.id} className="rounded-lg border-l-4 border-l-red-600 bg-red-50 p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-gray-900">{req.bloodGroup} Blood Needed</p>
+                      <Badge variant="danger">{req.unitsNeeded} units</Badge>
+                    </div>
+                    <div className="mt-2 grid gap-2 text-sm text-gray-600 md:grid-cols-3">
+                      <div className="flex items-center gap-1">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>{req.hospital?.name || 'Hospital'}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        <span>Status: {req.status}</span>
+                      </div>
+                      <div>
+                        <Badge variant="warning">{req.priority}</Badge>
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-2 grid gap-2 text-sm text-gray-600 md:grid-cols-3">
-                    <div className="flex items-center gap-1">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>{req.hospital}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      <span>ETA: {req.eta}</span>
-                    </div>
-                    <div>
-                      <Badge variant="warning">{req.priority}</Badge>
-                    </div>
-                  </div>
+                  <Button size="sm" variant="danger">
+                    Fulfill
+                  </Button>
                 </div>
-                <Button size="sm" variant="danger">
-                  Fulfill
-                </Button>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </Card>
 
@@ -259,35 +255,39 @@ export default function HospitalDashboard() {
       <Card className="mb-8">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">🤖 AI Recommendations</h2>
         <div className="space-y-3">
-          {AI_RECOMMENDATIONS.map((rec) => (
-            <div
-              key={rec.id}
-              className={`rounded-lg border-l-4 p-4 ${
-                rec.urgency === 'critical'
-                  ? 'border-l-red-600 bg-red-50'
-                  : rec.urgency === 'high'
-                    ? 'border-l-amber-600 bg-amber-50'
-                    : 'border-l-blue-600 bg-blue-50'
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-gray-900">{rec.title}</p>
-                    <Badge variant={rec.urgency === 'critical' ? 'danger' : rec.urgency === 'high' ? 'warning' : 'info'}>
-                      {rec.confidence}% confident
-                    </Badge>
+          {recommendations.length === 0 ? (
+            <p className="text-gray-600">No recommendations at this time</p>
+          ) : (
+            recommendations.map((rec: any, idx: number) => (
+              <div
+                key={rec.id || idx}
+                className={`rounded-lg border-l-4 p-4 ${
+                  rec.priority === 'Critical' || rec.urgency === 'critical'
+                    ? 'border-l-red-600 bg-red-50'
+                    : rec.priority === 'High' || rec.urgency === 'high'
+                      ? 'border-l-amber-600 bg-amber-50'
+                      : 'border-l-blue-600 bg-blue-50'
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-gray-900">{rec.title || rec.reason}</p>
+                      <Badge variant={rec.priority === 'Critical' ? 'danger' : rec.priority === 'High' ? 'warning' : 'info'}>
+                        {rec.confidence || 'N/A'}% confident
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-gray-600">{rec.reason || rec.description}</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-900">{rec.action || 'Review recommendation'}</span>
+                    </div>
                   </div>
-                  <p className="mt-1 text-sm text-gray-600">{rec.reason}</p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm font-medium text-gray-900">{rec.action}</span>
-                  </div>
+                  <Button size="sm">Accept</Button>
                 </div>
-                <Button size="sm">Accept</Button>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </Card>
 

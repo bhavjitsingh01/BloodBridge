@@ -1,14 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Heart, Bell, MapPin, History, AlertCircle, CheckCircle, Clock } from 'lucide-react'
+import { Heart, Bell, MapPin, History, AlertCircle, CheckCircle, Clock, Loader } from 'lucide-react'
 import DashboardLayout from '@/components/DashboardLayout'
 import StatCard from '@/components/StatCard'
 import Card from '@/components/Card'
 import Table from '@/components/Table'
 import Badge from '@/components/Badge'
 import Alert from '@/components/Alert'
-import { mockDonorData } from '@/lib/mockData'
+import { useDonorDashboardData } from '@/lib/useDashboardData'
+import { useAuth } from '@/lib/useAuth'
 
 const navItems = [
   { label: 'Dashboard', href: '/donor', icon: <Heart className="h-5 w-5" />, isActive: true },
@@ -17,15 +18,51 @@ const navItems = [
 ]
 
 export default function DonorDashboard() {
-  const { profile, notifications, donationHistory, nearbyDonationCenters } = mockDonorData
+  const { user } = useAuth()
+  const { data, loading, error } = useDonorDashboardData()
   const [daysSinceLastDonation, setDaysSinceLastDonation] = useState(0)
 
   useEffect(() => {
-    const lastDonationDate = new Date(profile.lastDonation).getTime()
-    const currentDate = new Date().getTime()
-    const days = Math.floor((currentDate - lastDonationDate) / (1000 * 60 * 60 * 24))
-    setDaysSinceLastDonation(days)
-  }, [profile.lastDonation])
+    if (user?.lastDonation) {
+      const lastDonationDate = new Date(user.lastDonation).getTime()
+      const currentDate = new Date().getTime()
+      const days = Math.floor((currentDate - lastDonationDate) / (1000 * 60 * 60 * 24))
+      setDaysSinceLastDonation(days)
+    }
+  }, [user?.lastDonation])
+
+  if (loading) {
+    return (
+      <DashboardLayout
+        title="Donor Dashboard"
+        subtitle="Loading dashboard..."
+        userRole="Blood Donor"
+        navItems={navItems}
+      >
+        <div className="flex justify-center items-center py-12">
+          <Loader className="h-8 w-8 animate-spin text-blood-600" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout
+        title="Donor Dashboard"
+        subtitle="Error loading dashboard"
+        userRole="Blood Donor"
+        navItems={navItems}
+      >
+        <Alert
+          type="danger"
+          title="Failed to load dashboard"
+          message={error}
+          className="mb-6"
+        />
+      </DashboardLayout>
+    )
+  }
 
   const donationHistoryColumns = [
     { key: 'date' as const, label: 'Date' },
@@ -38,7 +75,7 @@ export default function DonorDashboard() {
     },
   ]
 
-  const hasBloodDemand = notifications.some((notif) => notif.title.includes(profile.bloodGroup))
+  const notifications = data?.emergencyRequests || []
 
   return (
     <DashboardLayout
@@ -48,11 +85,11 @@ export default function DonorDashboard() {
       navItems={navItems}
     >
       {/* Profile Alert */}
-      {profile.availability !== 'Available' && (
+      {user?.availabilityStatus !== 'Available' && (
         <Alert
           type="warning"
           title="Availability Status"
-          message={`Your current status is: ${profile.availability}`}
+          message={`Your current status is: ${user?.availabilityStatus}`}
           className="mb-6"
         />
       )}
@@ -61,7 +98,7 @@ export default function DonorDashboard() {
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Blood Group"
-          value={profile.bloodGroup}
+          value={user?.bloodGroup || 'N/A'}
           icon={<Heart className="h-6 w-6" />}
           color="blood"
         />
@@ -73,14 +110,8 @@ export default function DonorDashboard() {
           color="blue"
         />
         <StatCard
-          label="Total Donations"
-          value={donationHistory.length}
-          icon={<History className="h-6 w-6" />}
-          color="amber"
-        />
-        <StatCard
           label="Nearby Centers"
-          value={nearbyDonationCenters.length}
+          value={data?.nearbyHospitals?.length || 0}
           icon={<MapPin className="h-6 w-6" />}
           color="green"
         />
@@ -97,17 +128,17 @@ export default function DonorDashboard() {
             <div className="mt-3 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Current Status:</span>
-                <Badge variant={profile.availability === 'Available' ? 'success' : 'warning'}>
-                  {profile.availability}
+                <Badge variant={user?.availabilityStatus === 'Available' ? 'success' : 'warning'}>
+                  {user?.availabilityStatus || 'N/A'}
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Location:</span>
-                <span className="font-medium text-gray-900">{profile.location}</span>
+                <span className="font-medium text-gray-900">{user?.location || 'N/A'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Contact:</span>
-                <span className="font-medium text-gray-900">{profile.phone}</span>
+                <span className="font-medium text-gray-900">{user?.phone || user?.email}</span>
               </div>
             </div>
           </div>
@@ -126,7 +157,7 @@ export default function DonorDashboard() {
               <div className="rounded-lg bg-green-50 p-4">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Eligibility Status:</span>
-                  <Badge variant="success">{profile.eligibility}</Badge>
+                  <Badge variant="success">{user?.availabilityStatus === 'Available' ? 'Eligible' : 'Check Status'}</Badge>
                 </div>
                 <p className="mt-2 text-sm text-gray-600">
                   You are eligible to donate blood. Please maintain good health and hydration before your donation.
@@ -135,11 +166,11 @@ export default function DonorDashboard() {
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="rounded border border-gray-200 p-3">
                   <p className="text-sm font-semibold text-gray-900">Last Donation</p>
-                  <p className="mt-1 text-sm text-gray-600">{profile.lastDonation}</p>
+                  <p className="mt-1 text-sm text-gray-600">{user?.lastDonation ? new Date(user.lastDonation).toLocaleDateString() : 'Never'}</p>
                 </div>
                 <div className="rounded border border-gray-200 p-3">
-                  <p className="text-sm font-semibold text-gray-900">Age Group</p>
-                  <p className="mt-1 text-sm text-gray-600">18 - 65 years</p>
+                  <p className="text-sm font-semibold text-gray-900">Next Eligible Date</p>
+                  <p className="mt-1 text-sm text-gray-600">{user?.nextEligibleDate ? new Date(user.nextEligibleDate).toLocaleDateString() : 'Check with center'}</p>
                 </div>
               </div>
             </div>
@@ -150,40 +181,30 @@ export default function DonorDashboard() {
       {/* Notification Center Section */}
       <Card className="mb-8">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Notification Center</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Blood Requests</h2>
           <Bell className="h-5 w-5 text-gray-400" />
         </div>
         <div className="space-y-3">
           {notifications.length > 0 ? (
-            notifications.map((notif) => (
+            notifications.map((notif: any) => (
               <div
-                key={notif.id}
+                key={notif._id || notif.id}
                 className="flex items-start gap-4 rounded-lg border border-gray-200 p-4"
               >
-                <div
-                  className={`flex-shrink-0 rounded-full p-2 ${
-                    notif.type === 'urgent' ? 'bg-red-100' : 'bg-blue-100'
-                  }`}
-                >
-                  <Bell
-                    className={`h-5 w-5 ${
-                      notif.type === 'urgent' ? 'text-red-600' : 'text-blue-600'
-                    }`}
-                  />
+                <div className="flex-shrink-0 rounded-full bg-red-100 p-2">
+                  <Bell className="h-5 w-5 text-red-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-gray-900">{notif.title}</p>
-                  <p className="text-sm text-gray-600">{notif.message}</p>
+                  <p className="font-semibold text-gray-900">{notif.bloodGroup} Blood Needed</p>
+                  <p className="text-sm text-gray-600">{notif.unitsNeeded} units required</p>
                   <div className="mt-2 flex gap-4 text-sm text-gray-500">
-                    <span>{notif.hospital}</span>
-                    <span>{notif.distance}</span>
+                    <span>{notif.hospital?.name}</span>
+                    <span>{notif.priority}</span>
                   </div>
                 </div>
-                {notif.type === 'urgent' && (
-                  <Badge variant="danger" className="flex-shrink-0">
-                    Urgent
-                  </Badge>
-                )}
+                <Badge variant="danger" className="flex-shrink-0">
+                  {notif.priority}
+                </Badge>
               </div>
             ))
           ) : (
@@ -200,28 +221,19 @@ export default function DonorDashboard() {
         </div>
       </Card>
 
-      {/* Donation History Section */}
-      <div className="mb-8">
-        <Table
-          title="Donation History"
-          columns={donationHistoryColumns}
-          data={donationHistory}
-        />
-      </div>
-
-      {/* Nearby Donation Centers Section */}
+      {/* Nearby Hospitals Section */}
       <Card>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Nearby Donation Centers</h2>
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Nearby Hospitals & Blood Banks</h2>
         <div className="grid gap-4 md:grid-cols-2">
-          {nearbyDonationCenters.map((center) => (
-            <div key={center.id} className="rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
-              <p className="font-semibold text-gray-900">{center.name}</p>
-              <p className="mt-2 text-sm text-gray-600">{center.address}</p>
+          {(data?.nearbyHospitals || []).slice(0, 4).map((hospital: any) => (
+            <div key={hospital._id || hospital.id} className="rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+              <p className="font-semibold text-gray-900">{hospital.name}</p>
+              <p className="mt-2 text-sm text-gray-600">{hospital.address || hospital.location}</p>
               <div className="mt-3 flex justify-between text-sm">
                 <span className="text-gray-600">
-                  <MapPin className="mb-1 inline h-4 w-4" /> {center.distance}
+                  <MapPin className="mb-1 inline h-4 w-4" /> {hospital.distance || 'N/A'}
                 </span>
-                <span className="text-gray-600">{center.hours}</span>
+                <Badge variant="success">Active</Badge>
               </div>
             </div>
           ))}

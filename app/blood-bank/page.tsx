@@ -1,13 +1,14 @@
 'use client'
 
-import { Droplets, TrendingUp, Clock, AlertCircle, Send, Truck, Heart } from 'lucide-react'
+import { Droplets, TrendingUp, Clock, AlertCircle, Send, Truck, Heart, Loader } from 'lucide-react'
 import DashboardLayout from '@/components/DashboardLayout'
 import StatCard from '@/components/StatCard'
 import Card from '@/components/Card'
 import Badge from '@/components/Badge'
 import Alert from '@/components/Alert'
 import Button from '@/components/Button'
-import { mockBloodBankData } from '@/lib/mockData'
+import { useBloodBankDashboardData } from '@/lib/useDashboardData'
+import { useAuth } from '@/lib/useAuth'
 import { formatDate } from '@/lib/dateUtils'
 
 const navItems = [
@@ -18,16 +19,54 @@ const navItems = [
 ]
 
 export default function BloodBankDashboard() {
-  const { profile, inventory, incomingDonations, outgoingTransfers, expiringBlood } = mockBloodBankData
+  const { user } = useAuth()
+  const { data, loading, error } = useBloodBankDashboardData()
 
-  const totalInventory = inventory.reduce((sum, inv) => sum + inv.available, 0)
-  const totalReserved = inventory.reduce((sum, inv) => sum + inv.reserved, 0)
-  const criticalItems = expiringBlood.filter((item) => item.daysLeft <= 3).length
+  if (loading) {
+    return (
+      <DashboardLayout
+        title="Blood Bank Operations"
+        subtitle="Loading dashboard..."
+        userRole="Blood Bank Manager"
+        navItems={navItems}
+      >
+        <div className="flex justify-center items-center py-12">
+          <Loader className="h-8 w-8 animate-spin text-blood-600" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout
+        title="Blood Bank Operations"
+        subtitle="Error loading dashboard"
+        userRole="Blood Bank Manager"
+        navItems={navItems}
+      >
+        <Alert
+          type="danger"
+          title="Failed to load dashboard"
+          message={error}
+          className="mb-6"
+        />
+      </DashboardLayout>
+    )
+  }
+
+  const inventory = data?.inventory || []
+  const expiryRisks = data?.expiryRisks || {}
+  const emergencyRequests = data?.emergencyRequests || []
+
+  const totalInventory = inventory.reduce((sum, inv) => sum + (inv.available || 0), 0)
+  const totalReserved = inventory.reduce((sum, inv) => sum + (inv.reserved || 0), 0)
+  const criticalItems = inventory.filter((item: any) => item.expiring > 0).length
 
   return (
     <DashboardLayout
       title="Blood Bank Operations"
-      subtitle={`${profile.name} - Inventory management and blood distribution`}
+      subtitle={`${user?.name || 'Blood Bank'} - Inventory management and blood distribution`}
       userRole="Blood Bank Manager"
       navItems={navItems}
     >
@@ -58,7 +97,7 @@ export default function BloodBankDashboard() {
         />
         <StatCard
           label="Pending Transfers"
-          value={outgoingTransfers.filter((t) => t.status !== 'Delivered').length}
+          value={emergencyRequests.filter((r: any) => r.status !== 'completed').length}
           icon={<Truck className="h-6 w-6" />}
           color="blue"
         />
@@ -105,20 +144,20 @@ export default function BloodBankDashboard() {
       {/* Expiring Blood Section */}
       <Card className="mb-8">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">⚠️ Expiring Blood</h2>
-        {expiringBlood.length > 0 ? (
+        {Object.keys(expiryRisks).length > 0 ? (
           <div className="space-y-3">
-            {expiringBlood.map((item) => (
+            {inventory.filter((inv: any) => inv.expiring > 0).map((item: any) => (
               <div
-                key={item.id}
+                key={item._id || item.id}
                 className="flex items-center justify-between rounded-lg border-l-4 border-l-amber-600 bg-amber-50 p-4"
               >
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="font-semibold text-amber-900">{item.bloodGroup} Blood</p>
-                    <Badge variant="warning">{item.daysLeft} days left</Badge>
+                    <Badge variant="warning">{item.expiring} units expiring</Badge>
                   </div>
                   <p className="mt-1 text-sm text-amber-800">
-                    {item.units} units • Expires on {item.expiringDate}
+                    {item.expiring} units expiring soon
                   </p>
                 </div>
                 <Button size="sm" variant="danger">
@@ -134,14 +173,14 @@ export default function BloodBankDashboard() {
 
       {/* Transfer Requests Section */}
       <Card className="mb-8">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">🚚 Transfer Requests</h2>
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">🚚 Emergency Requests</h2>
         <div className="space-y-3">
-          {outgoingTransfers.length > 0 ? (
-            outgoingTransfers.map((transfer) => (
+          {emergencyRequests.length > 0 ? (
+            emergencyRequests.map((req: any) => (
               <div
-                key={transfer.id}
+                key={req._id || req.id}
                 className={`rounded-lg border p-4 ${
-                  transfer.status === 'Delivered'
+                  req.status === 'completed'
                     ? 'border-green-200 bg-green-50'
                     : 'border-blue-200 bg-blue-50'
                 }`}
@@ -150,74 +189,71 @@ export default function BloodBankDashboard() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-gray-900">
-                        {transfer.bloodGroup} Blood → {transfer.hospitalName}
+                        {req.bloodGroup} Blood → {req.hospital?.name}
                       </p>
                       <Badge
                         variant={
-                          transfer.status === 'Delivered'
+                          req.status === 'completed'
                             ? 'success'
-                            : transfer.status === 'Dispatched'
+                            : req.status === 'in_progress'
                               ? 'warning'
                               : 'info'
                         }
                       >
-                        {transfer.status}
+                        {req.status}
                       </Badge>
                     </div>
                     <div className="mt-2 grid gap-2 text-sm text-gray-600 md:grid-cols-3">
                       <div>
-                        <span className="font-semibold text-gray-900">{transfer.units}</span> units
+                        <span className="font-semibold text-gray-900">{req.unitsNeeded}</span> units
                       </div>
                       <div>
-                        Dispatched: {formatDate(transfer.dispatchedAt)}
+                        Priority: {req.priority}
                       </div>
-                      {transfer.status === 'Delivered' && transfer.deliveredAt && (
-                        <div>Delivered: {formatDate(transfer.deliveredAt)}</div>
-                      )}
                     </div>
                   </div>
-                  {transfer.status !== 'Delivered' && (
-                    <Button size="sm">Track</Button>
+                  {req.status !== 'completed' && (
+                    <Button size="sm">Accept</Button>
                   )}
                 </div>
               </div>
             ))
           ) : (
-            <p className="text-gray-600">No pending transfers</p>
+            <p className="text-gray-600">No pending requests</p>
           )}
         </div>
       </Card>
 
-      {/* Incoming Donations Section */}
+      {/* Active Donors Section */}
       <Card>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">💝 Incoming Donations</h2>
-        {incomingDonations.length > 0 ? (
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">💝 Available Donors</h2>
+        {(data?.nearbyDonors || []).length > 0 ? (
           <div className="space-y-3">
-            {incomingDonations.map((donation) => (
+            {(data?.nearbyDonors || []).slice(0, 5).map((donor: any) => (
               <div
-                key={donation.id}
+                key={donor._id || donor.id}
                 className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-4"
               >
                 <div>
                   <div className="flex items-center gap-2">
                     <Heart className="h-5 w-5 text-green-600" />
                     <p className="font-semibold text-gray-900">
-                      {donation.bloodGroup} Blood Donation
+                      {donor.bloodGroup} Blood Donor
                     </p>
                   </div>
                   <p className="mt-1 text-sm text-gray-600">
-                    {donation.units} unit(s) • {donation.date} at {donation.time}
+                    {donor.name} • Available Status: {donor.availabilityStatus}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="success">{donation.status}</Badge>
-                  <Button size="sm">Confirm</Button>
+                  <Badge variant="success">Available</Badge>
+                  <Button size="sm">Contact</Button>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-gray-600">No incoming donations scheduled</p>
+          <p className="text-gray-600">No available donors at this time</p>
         )}
       </Card>
     </DashboardLayout>

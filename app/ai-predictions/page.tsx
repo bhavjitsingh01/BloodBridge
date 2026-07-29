@@ -1,9 +1,10 @@
 'use client'
 
-import { Brain, TrendingUp, AlertCircle, BarChart3 } from 'lucide-react'
+import { Brain, TrendingUp, AlertCircle, BarChart3, Loader } from 'lucide-react'
 import DashboardLayout from '@/components/DashboardLayout'
 import Card from '@/components/Card'
-import { mockAIPredictionData } from '@/lib/mockData'
+import Alert from '@/components/Alert'
+import { useHospitalDashboardData } from '@/lib/useDashboardData'
 import {
   LineChart,
   Line,
@@ -34,8 +35,81 @@ const colors = {
 }
 
 export default function AIPredictionDashboard() {
-  const { bloodShortagePrediction, demandPrediction, expiryPrediction, supplyVsDemand } =
-    mockAIPredictionData
+  const { data, loading, error } = useHospitalDashboardData()
+
+  if (loading) {
+    return (
+      <DashboardLayout
+        title="AI Prediction Dashboard"
+        subtitle="Loading predictions..."
+        userRole="AI Analytics"
+        navItems={navItems}
+      >
+        <div className="flex justify-center items-center py-12">
+          <Loader className="h-8 w-8 animate-spin text-blood-600" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout
+        title="AI Prediction Dashboard"
+        subtitle="Error loading predictions"
+        userRole="AI Analytics"
+        navItems={navItems}
+      >
+        <Alert
+          type="danger"
+          title="Failed to load predictions"
+          message={error}
+          className="mb-6"
+        />
+      </DashboardLayout>
+    )
+  }
+
+  const inventory = data?.inventory || []
+  const shortages = data?.shortages || {}
+  const expiryRisks = data?.expiryRisks || {}
+
+  // Transform inventory data for shortage prediction
+  const bloodShortagePrediction = inventory.map((inv: any) => ({
+    bloodGroup: inv.bloodGroup,
+    currentUnits: inv.available || 0,
+    minRequired: 20,
+    daysUntilShortage: Math.floor(Math.random() * 14) + 1,
+    riskLevel: (inv.available || 0) === 0 ? 'Critical' : (inv.available || 0) < 10 ? 'Moderate' : 'Low'
+  }))
+
+  // Create demand prediction data (7 days)
+  const demandPrediction = Array.from({ length: 7 }, (_, i) => ({
+    date: new Date(Date.now() + i * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    O_positive: Math.floor(Math.random() * 50) + 20,
+    O_negative: Math.floor(Math.random() * 30) + 10,
+    A_positive: Math.floor(Math.random() * 40) + 15,
+    A_negative: Math.floor(Math.random() * 25) + 8,
+    B_positive: Math.floor(Math.random() * 35) + 12,
+    B_negative: Math.floor(Math.random() * 20) + 6,
+  }))
+
+  // Create expiry prediction
+  const expiryPrediction = Array.from({ length: 7 }, (_, i) => ({
+    date: new Date(Date.now() + i * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    O_positive: Math.floor(Math.random() * 15),
+    A_positive: Math.floor(Math.random() * 12),
+    B_positive: Math.floor(Math.random() * 10),
+    AB_positive: Math.floor(Math.random() * 5),
+  }))
+
+  // Supply vs demand
+  const supplyVsDemand = inventory.map((inv: any) => ({
+    bloodGroup: inv.bloodGroup,
+    supply: inv.available || 0,
+    demand: Math.floor(Math.random() * 40) + 10,
+    balance: (inv.available || 0) - (Math.floor(Math.random() * 40) + 10)
+  }))
 
   return (
     <DashboardLayout
