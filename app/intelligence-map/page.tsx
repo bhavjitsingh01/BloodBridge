@@ -1,11 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { Heart, ArrowLeft } from 'lucide-react'
-import IndiaMap from '@/components/map/IndiaMap'
+import dynamic from 'next/dynamic'
 import StateAnalyticsPanel from '@/components/map/StateAnalyticsPanel'
 import { getStateData } from '@/lib/indiaMapData'
+
+const IndiaMap = dynamic(() => import('@/components/map/IndiaMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full items-center justify-center">
+      <div className="text-center">
+        <div className="mb-4 inline-block h-10 w-10 animate-spin rounded-full border-4 border-blood-200 border-t-blood-600"></div>
+        <p className="text-gray-600">Loading map...</p>
+      </div>
+    </div>
+  ),
+})
 
 export default function IntelligenceMapPage() {
   const [selectedState, setSelectedState] = useState<string | null>(null)
