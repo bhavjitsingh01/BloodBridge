@@ -1,7 +1,32 @@
-import Link from 'next/link'
-import { Heart } from 'lucide-react'
+'use client';
+
+import Link from 'next/link';
+import { Heart, AlertCircle, Loader } from 'lucide-react';
+import { useState } from 'react';
+import { useAuth } from '@/lib/useAuth';
 
 export default function LoginPage() {
+  const { login, loading, error } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError(null);
+
+    if (!email || !password) {
+      setLocalError('Please fill in all fields');
+      return;
+    }
+
+    try {
+      await login(email, password);
+    } catch (err: any) {
+      setLocalError(err.response?.data?.message || 'Login failed. Please try again.');
+    }
+  };
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-blood-50 to-gray-100">
       <div className="flex h-screen items-center justify-center">
@@ -12,33 +37,64 @@ export default function LoginPage() {
           </div>
 
           <h1 className="text-center text-2xl font-bold text-gray-900">Login</h1>
-          <p className="mt-2 text-center text-gray-600">Select your role to continue</p>
+          <p className="mt-2 text-center text-gray-600">Connect to your dashboard</p>
 
-          <div className="mt-8 space-y-3">
-            <Link
-              href="/donor"
-              className="block rounded-lg bg-blood-600 py-3 text-center font-semibold text-white hover:bg-blood-700"
+          {(error || localError) && (
+            <div className="mt-4 flex items-center gap-3 rounded-lg bg-red-50 p-4 text-red-700">
+              <AlertCircle className="h-5 w-5 flex-shrink-0" />
+              <p className="text-sm">{error || localError}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blood-500 focus:outline-none"
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blood-500 focus:outline-none"
+                disabled={loading}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-lg bg-blood-600 py-3 font-semibold text-white hover:bg-blood-700 disabled:opacity-50"
             >
-              Login as Donor
-            </Link>
-            <Link
-              href="/hospital"
-              className="block rounded-lg bg-blue-600 py-3 text-center font-semibold text-white hover:bg-blue-700"
-            >
-              Login as Hospital
-            </Link>
-            <Link
-              href="/blood-bank"
-              className="block rounded-lg bg-amber-600 py-3 text-center font-semibold text-white hover:bg-amber-700"
-            >
-              Login as Blood Bank
-            </Link>
-            <Link
-              href="/admin"
-              className="block rounded-lg bg-gray-800 py-3 text-center font-semibold text-white hover:bg-gray-900"
-            >
-              Login as Admin
-            </Link>
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader className="h-4 w-4 animate-spin" />
+                  Logging in...
+                </span>
+              ) : (
+                'Login'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              Demo Credentials:
+              <br />
+              Email: hospital@example.com
+              <br />
+              Password: SecurePass123!
+            </p>
           </div>
 
           <div className="mt-8 text-center">
@@ -49,5 +105,5 @@ export default function LoginPage() {
         </div>
       </div>
     </main>
-  )
+  );
 }
