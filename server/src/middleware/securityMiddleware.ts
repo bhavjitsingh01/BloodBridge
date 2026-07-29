@@ -69,7 +69,7 @@ export function setupSecurityMiddleware(app: Express): void {
         });
       }
     }
-    next();
+    return next();
   });
 
   // Trust proxy (for rate limiting to work correctly behind proxies)

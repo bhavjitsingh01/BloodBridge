@@ -1,0 +1,857 @@
+{
+  "info": {
+    "_postman_id": "bloodbridge-api-collection",
+    "name": "BloodBridge API",
+    "description": "Complete API collection for BloodBridge - AI-powered blood management ecosystem",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:5001/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "TOKEN",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"name\": \"John Doe\",\n  \"role\": \"Hospital\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/register",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  var jsonData = pm.response.json();",
+                  "  pm.environment.set(\"TOKEN\", jsonData.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"hospital@example.com\",\n  \"password\": \"SecurePass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/profile",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/logout",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Hospitals",
+      "item": [
+        {
+          "name": "List Hospitals",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/hospitals?page=1&limit=10&city=Boston",
+              "host": ["{{BASE_URL}}"],
+              "path": ["hospitals"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "city",
+                  "value": "Boston"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Hospital by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/hospitals/{{HOSPITAL_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["hospitals", "{{HOSPITAL_ID}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Hospital",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"New Hospital\",\n  \"email\": \"hospital@example.com\",\n  \"phone\": \"+91-9876543210\",\n  \"city\": \"Boston\",\n  \"state\": \"MA\",\n  \"latitude\": 42.3601,\n  \"longitude\": -71.0589\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/hospitals",
+              "host": ["{{BASE_URL}}"],
+              "path": ["hospitals"]
+            }
+          }
+        },
+        {
+          "name": "Update Hospital",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Hospital Name\",\n  \"phone\": \"+91-9876543210\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/hospitals/{{HOSPITAL_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["hospitals", "{{HOSPITAL_ID}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Hospital",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/hospitals/{{HOSPITAL_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["hospitals", "{{HOSPITAL_ID}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Blood Banks",
+      "item": [
+        {
+          "name": "List Blood Banks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/blood-banks?page=1&limit=10",
+              "host": ["{{BASE_URL}}"],
+              "path": ["blood-banks"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Blood Bank by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/blood-banks/{{BLOOD_BANK_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["blood-banks", "{{BLOOD_BANK_ID}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Blood Bank",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"New Blood Bank\",\n  \"email\": \"bloodbank@example.com\",\n  \"phone\": \"+91-9876543220\",\n  \"city\": \"Boston\",\n  \"state\": \"MA\",\n  \"latitude\": 42.3585,\n  \"longitude\": -71.0565\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/blood-banks",
+              "host": ["{{BASE_URL}}"],
+              "path": ["blood-banks"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Donors",
+      "item": [
+        {
+          "name": "List Donors",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/donors?page=1&limit=10&bloodGroup=O%2B",
+              "host": ["{{BASE_URL}}"],
+              "path": ["donors"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "bloodGroup",
+                  "value": "O+"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Donor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"John Donor\",\n  \"email\": \"donor@example.com\",\n  \"phone\": \"+91-9876543230\",\n  \"bloodGroup\": \"O+\",\n  \"age\": 30,\n  \"gender\": \"Male\",\n  \"city\": \"Boston\",\n  \"state\": \"MA\",\n  \"latitude\": 42.3601,\n  \"longitude\": -71.0589\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/donors",
+              "host": ["{{BASE_URL}}"],
+              "path": ["donors"]
+            }
+          }
+        },
+        {
+          "name": "Update Donor Availability",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"availabilityStatus\": \"Available\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/donors/{{DONOR_ID}}/availability",
+              "host": ["{{BASE_URL}}"],
+              "path": ["donors", "{{DONOR_ID}}", "availability"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Blood Inventory",
+      "item": [
+        {
+          "name": "List Inventory",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/inventory?page=1&limit=10&bloodGroup=O%2B",
+              "host": ["{{BASE_URL}}"],
+              "path": ["inventory"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "bloodGroup",
+                  "value": "O+"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Expiring Inventory",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/inventory/expiring?page=1&limit=10",
+              "host": ["{{BASE_URL}}"],
+              "path": ["inventory", "expiring"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Inventory Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/inventory/summary",
+              "host": ["{{BASE_URL}}"],
+              "path": ["inventory", "summary"]
+            }
+          }
+        },
+        {
+          "name": "Create Inventory",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hospitalId\": \"{{HOSPITAL_ID}}\",\n  \"bloodGroup\": \"O+\",\n  \"units\": 50,\n  \"expiryDate\": \"2026-08-28T00:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/inventory",
+              "host": ["{{BASE_URL}}"],
+              "path": ["inventory"]
+            }
+          }
+        },
+        {
+          "name": "Update Inventory",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"units\": 40\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/inventory/{{INVENTORY_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["inventory", "{{INVENTORY_ID}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Emergency Requests",
+      "item": [
+        {
+          "name": "List Emergency Requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/emergency?page=1&limit=10&priority=Critical",
+              "host": ["{{BASE_URL}}"],
+              "path": ["emergency"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "priority",
+                  "value": "Critical"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Emergency Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requesterId\": \"{{HOSPITAL_ID}}\",\n  \"requesterType\": \"Hospital\",\n  \"bloodGroup\": \"O+\",\n  \"unitsRequired\": 30,\n  \"priority\": \"Critical\",\n  \"requiredBefore\": \"2026-07-30T16:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/emergency",
+              "host": ["{{BASE_URL}}"],
+              "path": ["emergency"]
+            }
+          }
+        },
+        {
+          "name": "Execute Emergency Matching",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/emergency/matching/{{EMERGENCY_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["emergency", "matching", "{{EMERGENCY_ID}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Emergency Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Accepted\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/emergency/{{EMERGENCY_ID}}/status",
+              "host": ["{{BASE_URL}}"],
+              "path": ["emergency", "{{EMERGENCY_ID}}", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "AI & Predictions",
+      "item": [
+        {
+          "name": "Predict Demand",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"timeframe\": \"30days\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/ai/predict-demand",
+              "host": ["{{BASE_URL}}"],
+              "path": ["ai", "predict-demand"]
+            }
+          }
+        },
+        {
+          "name": "Get Predictions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/ai/predictions?timeframe=30days",
+              "host": ["{{BASE_URL}}"],
+              "path": ["ai", "predictions"],
+              "query": [
+                {
+                  "key": "timeframe",
+                  "value": "30days"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Detect Shortages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/ai/shortages",
+              "host": ["{{BASE_URL}}"],
+              "path": ["ai", "shortages"]
+            }
+          }
+        },
+        {
+          "name": "Get Expiry Risks",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/ai/expiry-risk?window=7days",
+              "host": ["{{BASE_URL}}"],
+              "path": ["ai", "expiry-risk"],
+              "query": [
+                {
+                  "key": "window",
+                  "value": "7days"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get AI Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/ai/dashboard",
+              "host": ["{{BASE_URL}}"],
+              "path": ["ai", "dashboard"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/notifications?page=1&limit=10",
+              "host": ["{{BASE_URL}}"],
+              "path": ["notifications"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/notifications/unread/count",
+              "host": ["{{BASE_URL}}"],
+              "path": ["notifications", "unread", "count"]
+            }
+          }
+        },
+        {
+          "name": "Mark as Read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/notifications/{{NOTIFICATION_ID}}/read",
+              "host": ["{{BASE_URL}}"],
+              "path": ["notifications", "{{NOTIFICATION_ID}}", "read"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Recommendations",
+      "item": [
+        {
+          "name": "Get Transfer Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/recommendations/transfers",
+              "host": ["{{BASE_URL}}"],
+              "path": ["recommendations", "transfers"]
+            }
+          }
+        },
+        {
+          "name": "Get Donor Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/recommendations/donors?emergencyRequestId={{EMERGENCY_ID}}&bloodGroup=O%2B&unitsRequired=10&latitude=42.3601&longitude=-71.0589",
+              "host": ["{{BASE_URL}}"],
+              "path": ["recommendations", "donors"],
+              "query": [
+                {
+                  "key": "emergencyRequestId",
+                  "value": "{{EMERGENCY_ID}}"
+                },
+                {
+                  "key": "bloodGroup",
+                  "value": "O+"
+                },
+                {
+                  "key": "unitsRequired",
+                  "value": "10"
+                },
+                {
+                  "key": "latitude",
+                  "value": "42.3601"
+                },
+                {
+                  "key": "longitude",
+                  "value": "-71.0589"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{BASE_URL}}/health",
+          "host": ["{{BASE_URL}}"],
+          "path": ["health"]
+        }
+      }
+    }
+  ]
+}

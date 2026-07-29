@@ -2,6 +2,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import 'express-async-errors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import compression from 'compression';
 import mongoose from 'mongoose';
 import swaggerUi from 'swagger-ui-express';
 import { corsConfig } from './middleware/corsConfig';
@@ -15,6 +16,9 @@ const app: Express = express();
 
 // Trust proxy
 app.set('trust proxy', 1);
+
+// Compression Middleware - Compress all responses
+app.use(compression());
 
 // Security Middleware
 app.use(helmet());
