@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Heart, Bell, MapPin, History, AlertCircle, CheckCircle, Clock } from 'lucide-react'
 import DashboardLayout from '@/components/DashboardLayout'
 import StatCard from '@/components/StatCard'
@@ -17,6 +18,14 @@ const navItems = [
 
 export default function DonorDashboard() {
   const { profile, notifications, donationHistory, nearbyDonationCenters } = mockDonorData
+  const [daysSinceLastDonation, setDaysSinceLastDonation] = useState(0)
+
+  useEffect(() => {
+    const lastDonationDate = new Date(profile.lastDonation).getTime()
+    const currentDate = new Date().getTime()
+    const days = Math.floor((currentDate - lastDonationDate) / (1000 * 60 * 60 * 24))
+    setDaysSinceLastDonation(days)
+  }, [profile.lastDonation])
 
   const donationHistoryColumns = [
     { key: 'date' as const, label: 'Date' },
@@ -58,7 +67,7 @@ export default function DonorDashboard() {
         />
         <StatCard
           label="Days Since Last Donation"
-          value={Math.floor((new Date().getTime() - new Date(profile.lastDonation).getTime()) / (1000 * 60 * 60 * 24))}
+          value={daysSinceLastDonation}
           unit="days"
           icon={<Clock className="h-6 w-6" />}
           color="blue"
