@@ -7,6 +7,8 @@ import donorRoutes from './donor.routes';
 import bloodInventoryRoutes from './blood-inventory.routes';
 import emergencyRoutes from './emergency.routes';
 import aiRoutes from './ai.routes';
+import notificationsRoutes from './notifications.routes';
+import recommendationsRoutes from './recommendations.routes';
 
 const router = Router();
 
@@ -30,6 +32,12 @@ router.use(`${API_PREFIX}/emergency`, emergencyRoutes);
 
 // AI routes
 router.use(`${API_PREFIX}/ai`, aiRoutes);
+
+// Notification routes
+router.use(`${API_PREFIX}/notifications`, notificationsRoutes);
+
+// Recommendation routes
+router.use(`${API_PREFIX}/recommendations`, recommendationsRoutes);
 
 // Health check endpoint
 router.get(`${API_PREFIX}/health`, (req, res) => {
