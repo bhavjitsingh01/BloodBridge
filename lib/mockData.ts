@@ -368,3 +368,39 @@ export const mockAdminData = {
     },
   ],
 }
+
+export const mockAIPredictionData = {
+  bloodShortagePrediction: [
+    { bloodGroup: 'O-', currentUnits: 45, minRequired: 80, daysUntilShortage: 2, riskLevel: 'Critical' },
+    { bloodGroup: 'A-', currentUnits: 120, minRequired: 100, daysUntilShortage: 5, riskLevel: 'Moderate' },
+    { bloodGroup: 'B-', currentUnits: 85, minRequired: 90, daysUntilShortage: 7, riskLevel: 'Low' },
+    { bloodGroup: 'AB-', currentUnits: 30, minRequired: 50, daysUntilShortage: 1, riskLevel: 'Critical' },
+    { bloodGroup: 'O+', currentUnits: 220, minRequired: 150, daysUntilShortage: 10, riskLevel: 'Safe' },
+  ],
+  demandPrediction: [
+    { date: 'Jul 29', O_positive: 45, O_negative: 12, A_positive: 38, A_negative: 8, B_positive: 52, B_negative: 10, AB_positive: 15, AB_negative: 3 },
+    { date: 'Jul 30', O_positive: 52, O_negative: 15, A_positive: 42, A_negative: 10, B_positive: 58, B_negative: 12, AB_positive: 18, AB_negative: 4 },
+    { date: 'Jul 31', O_positive: 48, O_negative: 13, A_positive: 40, A_negative: 9, B_positive: 55, B_negative: 11, AB_positive: 16, AB_negative: 3 },
+    { date: 'Aug 1', O_positive: 58, O_negative: 18, A_positive: 46, A_negative: 12, B_positive: 62, B_negative: 14, AB_positive: 20, AB_negative: 5 },
+    { date: 'Aug 2', O_positive: 55, O_negative: 16, A_positive: 44, A_negative: 11, B_positive: 60, B_negative: 13, AB_positive: 19, AB_negative: 4 },
+    { date: 'Aug 3', O_positive: 62, O_negative: 19, A_positive: 50, A_negative: 13, B_positive: 68, B_negative: 15, AB_positive: 22, AB_negative: 5 },
+    { date: 'Aug 4', O_positive: 60, O_negative: 17, A_positive: 48, A_negative: 12, B_positive: 65, B_negative: 14, AB_positive: 21, AB_negative: 5 },
+  ],
+  expiryPrediction: [
+    { date: 'Jul 29', O_positive: 8, A_positive: 5, B_positive: 6, AB_positive: 2 },
+    { date: 'Jul 31', O_positive: 12, A_positive: 8, B_positive: 9, AB_positive: 3 },
+    { date: 'Aug 2', O_positive: 15, A_positive: 10, B_positive: 12, AB_positive: 4 },
+    { date: 'Aug 4', O_positive: 18, A_positive: 12, B_positive: 14, AB_positive: 5 },
+    { date: 'Aug 6', O_positive: 22, A_positive: 15, B_positive: 17, AB_positive: 6 },
+  ],
+  supplyVsDemand: [
+    { bloodGroup: 'O+', supply: 280, demand: 150, balance: 130 },
+    { bloodGroup: 'O-', supply: 90, demand: 85, balance: 5 },
+    { bloodGroup: 'A+', supply: 220, demand: 120, balance: 100 },
+    { bloodGroup: 'A-', supply: 75, demand: 70, balance: 5 },
+    { bloodGroup: 'B+', supply: 240, demand: 140, balance: 100 },
+    { bloodGroup: 'B-', supply: 85, demand: 80, balance: 5 },
+    { bloodGroup: 'AB+', supply: 160, demand: 80, balance: 80 },
+    { bloodGroup: 'AB-', supply: 50, demand: 45, balance: 5 },
+  ],
+}
