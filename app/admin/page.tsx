@@ -8,6 +8,7 @@ import Table from '@/components/Table'
 import Badge from '@/components/Badge'
 import Alert from '@/components/Alert'
 import { mockAdminData } from '@/lib/mockData'
+import { formatDateTime } from '@/lib/dateUtils'
 
 const navItems = [
   { label: 'Dashboard', href: '/admin', icon: <Activity className="h-5 w-5" />, isActive: true },
@@ -167,7 +168,7 @@ export default function AdminDashboard() {
                   <div className="flex-1">
                     <p className="text-sm text-gray-900">{notif.message}</p>
                     <p className="mt-1 text-xs text-gray-500">
-                      {new Date(notif.timestamp).toLocaleString()}
+                      {formatDateTime(notif.timestamp)}
                     </p>
                   </div>
                 </div>

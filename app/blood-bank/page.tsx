@@ -8,6 +8,7 @@ import Badge from '@/components/Badge'
 import Alert from '@/components/Alert'
 import Button from '@/components/Button'
 import { mockBloodBankData } from '@/lib/mockData'
+import { formatDate } from '@/lib/dateUtils'
 
 const navItems = [
   { label: 'Dashboard', href: '/blood-bank', icon: <Droplets className="h-5 w-5" />, isActive: true },
@@ -168,10 +169,10 @@ export default function BloodBankDashboard() {
                         <span className="font-semibold text-gray-900">{transfer.units}</span> units
                       </div>
                       <div>
-                        Dispatched: {new Date(transfer.dispatchedAt).toLocaleDateString()}
+                        Dispatched: {formatDate(transfer.dispatchedAt)}
                       </div>
                       {transfer.status === 'Delivered' && transfer.deliveredAt && (
-                        <div>Delivered: {new Date(transfer.deliveredAt).toLocaleDateString()}</div>
+                        <div>Delivered: {formatDate(transfer.deliveredAt)}</div>
                       )}
                     </div>
                   </div>
