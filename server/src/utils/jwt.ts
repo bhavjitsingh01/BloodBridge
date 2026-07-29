@@ -5,7 +5,7 @@ import { AuthenticationError } from './errors';
 export interface JwtPayload {
   userId: string;
   email: string;
-  role: 'donor' | 'hospital' | 'blood-bank' | 'admin';
+  role: 'Donor' | 'Hospital' | 'BloodBank' | 'Admin' | 'donor' | 'hospital' | 'blood-bank' | 'admin';
   iat?: number;
   exp?: number;
 }

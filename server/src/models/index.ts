@@ -1,3 +1,4 @@
+import User from './User';
 import Hospital from './Hospital';
 import BloodBank from './BloodBank';
 import Donor from './Donor';
@@ -6,6 +7,7 @@ import EmergencyRequest from './EmergencyRequest';
 import Notification from './Notification';
 
 export {
+  User,
   Hospital,
   BloodBank,
   Donor,

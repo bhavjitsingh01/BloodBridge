@@ -1,94 +1,105 @@
 import { Schema, model, Document } from 'mongoose';
-import { USER_ROLES, UserRole } from '../config/constants';
+import bcrypt from 'bcrypt';
 
 export interface IUser extends Document {
+  role: 'Donor' | 'Hospital' | 'BloodBank' | 'Admin';
   email: string;
   password: string;
-  phone: string;
-  role: UserRole;
-  firstName: string;
-  lastName: string;
-  dateOfBirth: Date;
-  address: {
-    street: string;
-    city: string;
-    state: string;
-    pincode: string;
-    coordinates: {
-      latitude: number;
-      longitude: number;
-    };
-  };
-  verified: boolean;
-  active: boolean;
+  name?: string;
+  fullName?: string;
+  hospitalName?: string;
+  bloodBankName?: string;
+  phone?: string;
+  bloodGroup?: string;
+  city?: string;
+  state?: string;
+  address?: string;
+  isVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
+  comparePassword(password: string): Promise<boolean>;
 }
 
 const userSchema = new Schema<IUser>(
   {
+    role: {
+      type: String,
+      required: [true, 'Role is required'],
+      enum: {
+        values: ['Donor', 'Hospital', 'BloodBank', 'Admin'],
+        message: 'Role must be one of: Donor, Hospital, BloodBank, Admin',
+      },
+    },
     email: {
       type: String,
-      required: true,
+      required: [true, 'Email is required'],
       unique: true,
       lowercase: true,
       trim: true,
+      match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please provide a valid email'],
     },
     password: {
       type: String,
-      required: true,
-      minlength: 6,
+      required: [true, 'Password is required'],
+      minlength: [8, 'Password must be at least 8 characters'],
+      select: false,
     },
-    phone: {
+    name: {
       type: String,
-      required: true,
-      unique: true,
       trim: true,
     },
-    role: {
+    fullName: {
       type: String,
-      enum: USER_ROLES,
-      default: 'donor',
-    },
-    firstName: {
-      type: String,
-      required: true,
       trim: true,
     },
-    lastName: {
+    hospitalName: {
       type: String,
-      required: true,
       trim: true,
     },
-    dateOfBirth: {
-      type: Date,
-      required: true,
+    bloodBankName: {
+      type: String,
+      trim: true,
     },
-    address: {
-      street: { type: String, required: true },
-      city: { type: String, required: true },
-      state: { type: String, required: true },
-      pincode: { type: String, required: true },
-      coordinates: {
-        latitude: { type: Number, required: true },
-        longitude: { type: Number, required: true },
+    phone: String,
+    bloodGroup: {
+      type: String,
+      enum: {
+        values: ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'],
+        message: 'Invalid blood group',
       },
     },
-    verified: {
+    city: String,
+    state: String,
+    address: String,
+    isVerified: {
       type: Boolean,
       default: false,
-    },
-    active: {
-      type: Boolean,
-      default: true,
     },
   },
   { timestamps: true }
 );
 
+// Hash password before saving
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) {
+    return next();
+  }
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error as Error);
+  }
+});
+
+// Method to compare passwords
+userSchema.methods.comparePassword = async function (password: string): Promise<boolean> {
+  return bcrypt.compare(password, this.password);
+};
+
 // Indexes
-userSchema.index({ email: 1 }, { unique: true });
-userSchema.index({ phone: 1 });
+userSchema.index({ email: 1 });
 userSchema.index({ role: 1 });
 
 export default model<IUser>('User', userSchema);
