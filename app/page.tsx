@@ -76,6 +76,13 @@ export default function Home() {
               Roles
             </a>
             <Link
+              href="/emergency-coordination"
+              className="flex items-center gap-2 text-gray-700 hover:text-blood-600"
+            >
+              <AlertCircle className="h-4 w-4" />
+              Emergency
+            </Link>
+            <Link
               href="/login"
               className="rounded-lg bg-blood-600 px-6 py-2 font-semibold text-white hover:bg-blood-700"
             >
@@ -105,6 +112,13 @@ export default function Home() {
               <a href="#roles" className="text-gray-700 hover:text-blood-600">
                 Roles
               </a>
+              <Link
+                href="/emergency-coordination"
+                className="flex items-center gap-2 text-gray-700 hover:text-blood-600"
+              >
+                <AlertCircle className="h-4 w-4" />
+                Emergency Dashboard
+              </Link>
               <Link
                 href="/login"
                 className="rounded-lg bg-blood-600 px-6 py-2 font-semibold text-white hover:bg-blood-700"
