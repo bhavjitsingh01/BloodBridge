@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { Heart, ArrowLeft } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import StateAnalyticsPanel from '@/components/map/StateAnalyticsPanel'
+import EnhancedStatePanel from '@/components/map/EnhancedStatePanel'
 import { getStateData } from '@/lib/indiaMapData'
 
-const IndiaMap = dynamic(() => import('@/components/map/IndiaMap'), {
+const GeographicIndiaMap = dynamic(() => import('@/components/map/GeographicIndiaMap'), {
   ssr: false,
   loading: () => (
     <div className="flex h-full items-center justify-center">
@@ -35,14 +35,14 @@ export default function IntelligenceMapPage() {
   return (
     <main className="flex h-screen flex-col bg-gray-50">
       {/* Header */}
-      <header className="border-b border-gray-200 bg-white shadow-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+      <header className="border-b border-gray-200 bg-white shadow-sm z-10">
+        <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2 text-gray-600 hover:text-blood-600">
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <Heart className="h-8 w-8 text-blood-600" />
-            <h1 className="text-2xl font-bold text-gray-900">India Intelligence Map</h1>
+            <h1 className="text-2xl font-bold text-gray-900">India Blood Intelligence Map</h1>
           </div>
           <Link
             href="/"
@@ -55,23 +55,15 @@ export default function IntelligenceMapPage() {
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Side - Map */}
-        <div className="flex-1 overflow-auto border-r border-gray-200 bg-white">
-          <IndiaMap selectedState={selectedState} onStateSelect={handleStateSelect} />
+        {/* Left Side - Geographic Map */}
+        <div className="flex-1 overflow-hidden border-r border-gray-200 bg-white">
+          <GeographicIndiaMap selectedState={selectedState} onStateSelect={handleStateSelect} />
         </div>
 
         {/* Right Side - Analytics Panel */}
-        <div className="w-full overflow-hidden md:w-96 lg:w-[450px]">
-          <StateAnalyticsPanel state={selectedStateData} loading={loading} />
+        <div className="w-full overflow-hidden md:w-96 lg:w-[450px] bg-white">
+          <EnhancedStatePanel state={selectedStateData} loading={loading} />
         </div>
-      </div>
-
-      {/* Info Banner */}
-      <div className="border-t border-gray-200 bg-blue-50 px-6 py-3">
-        <p className="text-sm text-blue-900">
-          💡 <strong>Click on any state circle</strong> or use the list below to view detailed blood supply analytics,
-          shortage predictions, and hospital/blood bank distribution.
-        </p>
       </div>
     </main>
   )
