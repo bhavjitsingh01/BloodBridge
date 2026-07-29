@@ -3,6 +3,7 @@ import { API_PREFIX } from '../config/constants';
 import authRoutes from './auth.routes';
 import hospitalRoutes from './hospital.routes';
 import bloodBankRoutes from './blood-bank.routes';
+import donorRoutes from './donor.routes';
 
 const router = Router();
 
@@ -14,6 +15,9 @@ router.use(`${API_PREFIX}/hospitals`, hospitalRoutes);
 
 // Blood Bank routes
 router.use(`${API_PREFIX}/blood-banks`, bloodBankRoutes);
+
+// Donor routes
+router.use(`${API_PREFIX}/donors`, donorRoutes);
 
 // Health check endpoint
 router.get(`${API_PREFIX}/health`, (req, res) => {
