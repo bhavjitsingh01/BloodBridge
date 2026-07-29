@@ -6,7 +6,7 @@ interface StatCardProps {
   value: string | number
   unit?: string
   icon: React.ReactNode
-  color?: 'blood' | 'blue' | 'amber' | 'green'
+  color?: 'blood' | 'blue' | 'amber' | 'green' | 'red'
   trend?: {
     value: number
     direction: 'up' | 'down'
@@ -18,6 +18,7 @@ const colorClasses = {
   blue: 'bg-blue-50 text-blue-600',
   amber: 'bg-amber-50 text-amber-600',
   green: 'bg-green-50 text-green-600',
+  red: 'bg-red-50 text-red-600',
 }
 
 export default function StatCard({

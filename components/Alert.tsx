@@ -8,6 +8,7 @@ interface AlertProps {
   title: string
   message?: string
   onClose?: () => void
+  className?: string
 }
 
 const styles = {
@@ -53,12 +54,12 @@ const styles = {
   },
 }
 
-export default function Alert({ type, title, message, onClose }: AlertProps) {
+export default function Alert({ type, title, message, onClose, className }: AlertProps) {
   const style = styles[type]
   const Icon = style.icon
 
   return (
-    <div className={clsx('rounded-lg border p-4', style.bg, style.border)}>
+    <div className={clsx('rounded-lg border p-4', style.bg, style.border, className)}>
       <div className="flex gap-3">
         <Icon className={clsx('h-5 w-5 flex-shrink-0', style.iconColor)} />
         <div className="flex-1">
