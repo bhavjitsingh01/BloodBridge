@@ -110,10 +110,13 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       success: true,
       message: 'User registered successfully',
       data: {
-        userId: user._id,
-        email: user.email,
-        role: user.role,
         token,
+        user: {
+          id: user._id.toString(),
+          email: user.email,
+          role: user.role,
+          name: user.name || user.fullName || user.hospitalName || user.bloodBankName || 'User',
+        },
       },
     });
   } catch (error) {
@@ -172,10 +175,13 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       success: true,
       message: 'Login successful',
       data: {
-        userId: user._id,
-        email: user.email,
-        role: user.role,
         token,
+        user: {
+          id: user._id.toString(),
+          email: user.email,
+          role: user.role,
+          name: user.name || user.fullName || user.hospitalName || user.bloodBankName || 'User',
+        },
       },
     });
   } catch (error) {
