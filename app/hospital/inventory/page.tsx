@@ -70,9 +70,13 @@ export default function HospitalInventory() {
 
   const handleAddOrUpdate = async () => {
     try {
+      const hospitalList = await apiClient.getHospitals()
+      const hospital = hospitalList[0]
+      const hospitalId = hospital?._id || hospital?.id || ''
+
       const payload = {
         ...formData,
-        hospitalId: user?.id || '',
+        hospitalId,
         collectionDate: new Date().toISOString().split('T')[0],
       }
       if (editingId) {
