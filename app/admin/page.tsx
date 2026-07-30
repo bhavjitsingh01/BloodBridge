@@ -68,6 +68,26 @@ export default function AdminDashboard() {
 
   const criticalBloodGroups = inventory.filter((inv: any) => (inv.available || 0) < 10).length
 
+  // Calculate city blood availability
+  const cityBloodAvailability = hospitals.reduce((acc: any, hospital: any) => {
+    const city = hospital.city || hospital.address || 'Unknown'
+    if (!acc[city]) {
+      acc[city] = { city, total: 0, hospitals: 0 }
+    }
+    acc[city].hospitals += 1
+
+    // Find inventory for this hospital
+    const hospitalInventory = inventory.filter((inv: any) =>
+      inv.hospitalId === hospital._id || inv.hospitalId === hospital.id
+    )
+    const hospitalTotal = hospitalInventory.reduce((sum: number, inv: any) => sum + (inv.available || 0), 0)
+    acc[city].total += hospitalTotal
+
+    return acc
+  }, {})
+
+  const cityBloodList = Object.values(cityBloodAvailability).sort((a: any, b: any) => b.total - a.total)
+
   const hospitalsColumns = [
     { key: 'name' as const, label: 'Hospital' },
     { key: 'location' as const, label: 'Location' },
@@ -144,9 +164,9 @@ export default function AdminDashboard() {
         />
       </div>
 
-      {/* City Blood Availability */}
+      {/* Blood Group Availability */}
       <Card className="mb-8">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">City Blood Availability Status</h2>
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Blood Group Availability Status</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {inventory.map((blood: any) => {
             const available = blood.available || 0
@@ -171,6 +191,56 @@ export default function AdminDashboard() {
               </div>
             )
           })}
+        </div>
+      </Card>
+
+      {/* City Blood Availability */}
+      <Card className="mb-8">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Blood Availability by City</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">City</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Hospitals</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Total Units</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cityBloodList.length > 0 ? (
+                cityBloodList.map((city: any) => {
+                  const status = city.total === 0 ? 'Critical' : city.total < 50 ? 'Low' : 'Stable'
+                  return (
+                    <tr key={city.city} className="border-b border-gray-200 hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm text-gray-900">{city.city}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{city.hospitals}</td>
+                      <td className="px-4 py-3 text-sm font-semibold text-gray-900">{city.total}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <Badge
+                          variant={
+                            status === 'Critical'
+                              ? 'danger'
+                              : status === 'Low'
+                                ? 'warning'
+                                : 'success'
+                          }
+                        >
+                          {status}
+                        </Badge>
+                      </td>
+                    </tr>
+                  )
+                })
+              ) : (
+                <tr>
+                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">
+                    No city data available
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </Card>
 
