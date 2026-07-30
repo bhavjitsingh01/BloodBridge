@@ -9,36 +9,36 @@ type UserRole = 'donor' | 'hospital' | 'blood-bank' | 'admin' | null;
 
 const roles = [
   {
-    id: 'donor',
+    id: 'Donor',
     title: 'Donor',
     icon: <Droplet className="h-8 w-8" />,
     description: 'Save lives by donating blood',
-    email: 'donor@example.com',
+    email: 'donor1@example.com',
     password: 'SecurePass123!',
   },
   {
-    id: 'hospital',
+    id: 'Hospital',
     title: 'Hospital',
     icon: <Building2 className="h-8 w-8" />,
     description: 'Manage blood inventory and requests',
-    email: 'hospital@example.com',
+    email: 'hospital1@example.com',
     password: 'SecurePass123!',
   },
   {
-    id: 'blood-bank',
+    id: 'BloodBank',
     title: 'Blood Bank',
     icon: <Users className="h-8 w-8" />,
     description: 'Coordinate blood supply and distribution',
-    email: 'blood-bank@example.com',
+    email: 'bloodbank1@example.com',
     password: 'SecurePass123!',
   },
   {
-    id: 'admin',
+    id: 'Admin',
     title: 'Admin',
     icon: <Shield className="h-8 w-8" />,
     description: 'Monitor system and analytics',
     email: 'admin@example.com',
-    password: 'SecurePass123!',
+    password: 'AdminPass123!',
   },
 ];
 

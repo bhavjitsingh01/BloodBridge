@@ -5,8 +5,15 @@ import BloodBank from '../models/BloodBank';
 import Donor from '../models/Donor';
 import BloodInventory from '../models/BloodInventory';
 import logger from '../utils/logger';
+import bcrypt from 'bcrypt';
 
 const BLOOD_GROUPS = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+
+// Hash passwords helper function
+const hashPassword = async (password: string) => {
+  const salt = await bcrypt.genSalt(10);
+  return bcrypt.hash(password, salt);
+};
 
 async function seedDatabase() {
   try {
@@ -25,19 +32,19 @@ async function seedDatabase() {
     const hospitalUsers = await User.insertMany([
       {
         email: 'hospital1@example.com',
-        password: 'SecurePass123!', // Will be hashed by pre-save hook
+        password: await hashPassword('SecurePass123!'),
         name: 'St Mary Hospital',
         role: 'Hospital',
       },
       {
         email: 'hospital2@example.com',
-        password: 'SecurePass123!',
+        password: await hashPassword('SecurePass123!'),
         name: 'City Medical Center',
         role: 'Hospital',
       },
       {
         email: 'hospital3@example.com',
-        password: 'SecurePass123!',
+        password: await hashPassword('SecurePass123!'),
         name: 'Apollo Hospital',
         role: 'Hospital',
       },
@@ -47,13 +54,13 @@ async function seedDatabase() {
     const bloodBankUsers = await User.insertMany([
       {
         email: 'bloodbank1@example.com',
-        password: 'SecurePass123!',
+        password: await hashPassword('SecurePass123!'),
         name: 'National Blood Bank',
         role: 'BloodBank',
       },
       {
         email: 'bloodbank2@example.com',
-        password: 'SecurePass123!',
+        password: await hashPassword('SecurePass123!'),
         name: 'Regional Blood Center',
         role: 'BloodBank',
       },
@@ -63,25 +70,26 @@ async function seedDatabase() {
     const donorUsers = await User.insertMany([
       {
         email: 'donor1@example.com',
-        password: 'SecurePass123!',
+        password: await hashPassword('SecurePass123!'),
         name: 'John Doe',
         role: 'Donor',
       },
       {
         email: 'donor2@example.com',
-        password: 'SecurePass123!',
+        password: await hashPassword('SecurePass123!'),
         name: 'Jane Smith',
         role: 'Donor',
       },
     ]);
 
-    // Create Admin User
-    const adminUser = await User.create({
+    // Create Admin User - using insertMany for consistency
+    const adminUsers = await User.insertMany([{
       email: 'admin@example.com',
-      password: 'AdminPass123!',
+      password: await hashPassword('AdminPass123!'),
       name: 'Admin User',
       role: 'Admin',
-    });
+    }]);
+    const adminUser = adminUsers[0];
 
     logger.info(`Created ${hospitalUsers.length + bloodBankUsers.length + donorUsers.length + 1} users`);
 
@@ -91,6 +99,7 @@ async function seedDatabase() {
         name: 'St Mary Hospital',
         email: hospitalUsers[0].email,
         phone: '+91-9876543210',
+        address: '123 Main St, Boston MA 02101',
         city: 'Boston',
         state: 'MA',
         location: {
@@ -102,6 +111,7 @@ async function seedDatabase() {
         name: 'City Medical Center',
         email: hospitalUsers[1].email,
         phone: '+91-9876543211',
+        address: '456 Park Ave, New York NY 10022',
         city: 'New York',
         state: 'NY',
         location: {
@@ -113,6 +123,7 @@ async function seedDatabase() {
         name: 'Apollo Hospital',
         email: hospitalUsers[2].email,
         phone: '+91-9876543212',
+        address: '789 Market St, San Francisco CA 94102',
         city: 'San Francisco',
         state: 'CA',
         location: {
@@ -130,6 +141,7 @@ async function seedDatabase() {
         name: 'National Blood Bank',
         email: bloodBankUsers[0].email,
         phone: '+91-9876543213',
+        address: '321 Health Dr, Boston MA 02115',
         city: 'Boston',
         state: 'MA',
         location: {
@@ -141,6 +153,7 @@ async function seedDatabase() {
         name: 'Regional Blood Center',
         email: bloodBankUsers[1].email,
         phone: '+91-9876543214',
+        address: '654 Medical Blvd, New York NY 10016',
         city: 'New York',
         state: 'NY',
         location: {
@@ -184,24 +197,28 @@ async function seedDatabase() {
         },
         availabilityStatus: 'Available',
       },
-      ...Array.from({ length: 8 }, (_, i) => ({
-        fullName: `Donor ${i + 3}`,
-        email: `donor${i + 3}@example.com`,
-        phone: `+91-987654${3220 + i}`,
-        bloodGroup: BLOOD_GROUPS[i % BLOOD_GROUPS.length],
-        age: 25 + (i % 40),
-        gender: i % 2 === 0 ? 'Male' : 'Female',
-        city: ['Boston', 'New York', 'San Francisco'][i % 3],
-        state: ['MA', 'NY', 'CA'][i % 3],
-        location: {
-          type: 'Point',
-          coordinates: [
-            [-71.0589, 42.3601, -74.006, 40.7128, -122.4194, 37.7749][i % 6],
-            [-71.0589, 42.3601, -74.006, 40.7128, -122.4194, 37.7749][i % 6],
-          ],
-        },
-        availabilityStatus: 'Available',
-      })),
+      ...Array.from({ length: 8 }, (_, i) => {
+        const coords = [
+          [-71.0589, 42.3601],
+          [-74.006, 40.7128],
+          [-122.4194, 37.7749],
+        ];
+        return {
+          fullName: `Donor ${i + 3}`,
+          email: `donor${i + 3}@example.com`,
+          phone: `+91-987654${3220 + i}`,
+          bloodGroup: BLOOD_GROUPS[i % BLOOD_GROUPS.length],
+          age: 25 + (i % 40),
+          gender: i % 2 === 0 ? 'Male' : 'Female',
+          city: ['Boston', 'New York', 'San Francisco'][i % 3],
+          state: ['MA', 'NY', 'CA'][i % 3],
+          location: {
+            type: 'Point',
+            coordinates: coords[i % 3],
+          },
+          availabilityStatus: 'Available',
+        };
+      }),
     ]);
 
     logger.info(`Created ${donors.length} donors`);
