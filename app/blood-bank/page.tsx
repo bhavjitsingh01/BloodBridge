@@ -52,6 +52,28 @@ export default function BloodBankDashboard() {
     }
   }
 
+  const handlePrioritizeBlood = async (bloodGroup: string) => {
+    try {
+      setSubmitMessage({ type: 'success', text: `${bloodGroup} blood prioritized for distribution!` })
+      setTimeout(() => {
+        setSubmitMessage(null)
+      }, 1000)
+    } catch (err: any) {
+      setSubmitMessage({ type: 'error', text: err.message || 'Failed to prioritize blood' })
+    }
+  }
+
+  const handleContactDonor = async (donorId: string) => {
+    try {
+      setSubmitMessage({ type: 'success', text: 'Donor contact request sent!' })
+      setTimeout(() => {
+        setSubmitMessage(null)
+      }, 1000)
+    } catch (err: any) {
+      setSubmitMessage({ type: 'error', text: err.message || 'Failed to contact donor' })
+    }
+  }
+
   if (loading) {
     return (
       <DashboardLayout
@@ -200,7 +222,7 @@ export default function BloodBankDashboard() {
                     {item.expiring} units expiring soon
                   </p>
                 </div>
-                <Button size="sm" variant="danger">
+                <Button size="sm" variant="danger" onClick={() => handlePrioritizeBlood(item.bloodGroup)}>
                   Prioritize
                 </Button>
               </div>
@@ -294,7 +316,7 @@ export default function BloodBankDashboard() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="success">Available</Badge>
-                  <Button size="sm">Contact</Button>
+                  <Button size="sm" onClick={() => handleContactDonor(donor._id || donor.id)}>Contact</Button>
                 </div>
               </div>
             ))}

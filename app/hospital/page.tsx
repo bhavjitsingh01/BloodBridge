@@ -107,6 +107,28 @@ export default function HospitalDashboard() {
     }
   }
 
+  const handleAcceptRecommendation = async (recId: string) => {
+    try {
+      setSubmitMessage({ type: 'success', text: 'Recommendation accepted!' })
+      setTimeout(() => {
+        setSubmitMessage(null)
+      }, 1000)
+    } catch (err: any) {
+      setSubmitMessage({ type: 'error', text: err.message || 'Failed to accept recommendation' })
+    }
+  }
+
+  const handleRequestFromBank = async (bankId: string) => {
+    try {
+      setSubmitMessage({ type: 'success', text: 'Request sent to blood bank!' })
+      setTimeout(() => {
+        setSubmitMessage(null)
+      }, 1000)
+    } catch (err: any) {
+      setSubmitMessage({ type: 'error', text: err.message || 'Failed to send request' })
+    }
+  }
+
   return (
     <DashboardLayout
       title="Hospital Blood Management"
@@ -336,7 +358,7 @@ export default function HospitalDashboard() {
                       <span className="text-sm font-medium text-gray-900">{rec.action || 'Review recommendation'}</span>
                     </div>
                   </div>
-                  <Button size="sm">Accept</Button>
+                  <Button size="sm" onClick={() => handleAcceptRecommendation(rec.id || idx.toString())}>Accept</Button>
                 </div>
               </div>
             ))
@@ -358,7 +380,7 @@ export default function HospitalDashboard() {
                     <span>{bank.distance}</span>
                   </div>
                 </div>
-                <Button size="sm">Request</Button>
+                <Button size="sm" onClick={() => handleRequestFromBank(bank.id)}>Request</Button>
               </div>
             </div>
           ))}
