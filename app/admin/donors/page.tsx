@@ -61,7 +61,21 @@ export default function AdminDonors() {
       setLoading(true)
       setError(null)
       const result = await apiClient.getDonors({ limit: 100 })
-      setDonors(result.data || [])
+      // Map API response to component interface
+      const mappedDonors = (result.data || []).map((donor: any) => ({
+        id: donor._id || donor.id || '',
+        _id: donor._id,
+        name: donor.fullName || donor.name || '',
+        bloodGroup: donor.bloodGroup || '',
+        city: donor.city || '',
+        phone: donor.phone || '',
+        email: donor.email || '',
+        age: donor.age,
+        availabilityStatus: donor.availabilityStatus || 'Unavailable',
+        lastDonationDate: donor.lastDonationDate,
+        status: donor.status
+      }))
+      setDonors(mappedDonors)
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to load donors')
     } finally {
