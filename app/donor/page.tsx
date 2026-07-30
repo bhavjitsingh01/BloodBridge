@@ -64,17 +64,42 @@ export default function DonorDashboard() {
       } else {
         await apiClient.createDonor(formData)
       }
+
+      // Fetch updated profile to refresh user data
+      const updatedProfile = await apiClient.getProfile()
+      localStorage.setItem('authUser', JSON.stringify(updatedProfile))
+
       setSubmitMessage({ type: 'success', text: 'Donor profile updated successfully!' })
       setShowEditForm(false)
       setTimeout(() => {
         refetch()
         setSubmitMessage(null)
-      }, 1000)
+        // Reload page to refresh user context
+        window.location.reload()
+      }, 1500)
     } catch (err: any) {
       setSubmitMessage({ type: 'error', text: err.message || 'Failed to save donor data' })
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleCancel = () => {
+    // Reset formData to original user data when canceling
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        fullName: user.name || '',
+        bloodGroup: (user as any)?.bloodGroup || 'O+',
+        age: (user as any)?.age || 25,
+        gender: (user as any)?.gender || 'Male',
+        city: (user as any)?.city || '',
+        state: (user as any)?.state || '',
+        phone: (user as any)?.phone || '',
+        availabilityStatus: (user as any)?.availabilityStatus || 'Available',
+      }))
+    }
+    setShowEditForm(false)
   }
 
   if (loading) {
@@ -286,7 +311,7 @@ export default function DonorDashboard() {
                   <Button size="sm" onClick={handleSaveDonorData} disabled={isSubmitting}>
                     {isSubmitting ? 'Saving...' : 'Save Profile'}
                   </Button>
-                  <Button size="sm" variant="secondary" onClick={() => setShowEditForm(false)} disabled={isSubmitting}>
+                  <Button size="sm" variant="secondary" onClick={handleCancel} disabled={isSubmitting}>
                     Cancel
                   </Button>
                 </div>

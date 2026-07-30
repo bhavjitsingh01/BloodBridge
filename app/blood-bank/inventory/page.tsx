@@ -69,15 +69,29 @@ export default function BloodBankInventory() {
 
   const handleAddOrUpdate = async () => {
     try {
+      // Validate expiry date
+      if (!formData.expiryDate) {
+        setError('Expiry date is required')
+        return
+      }
+
       const hospitalList = await apiClient.getHospitals()
-      const hospital = hospitalList[0]
-      const hospitalId = hospital?._id || hospital?.id || ''
+      const hospital = hospitalList.data?.[0] || hospitalList[0]
+      const hospitalId = hospital?._id || hospital?.id || user?.id || ''
+
+      if (!hospitalId) {
+        setError('Blood bank ID not found')
+        return
+      }
 
       const payload = {
-        ...formData,
+        bloodGroup: formData.bloodGroup,
+        units: formData.units,
+        expiryDate: formData.expiryDate,
         hospitalId,
         collectionDate: new Date().toISOString().split('T')[0],
       }
+
       if (editingId) {
         await apiClient.updateInventory(editingId, payload)
       } else {
@@ -86,9 +100,10 @@ export default function BloodBankInventory() {
       setShowAddForm(false)
       setEditingId(null)
       setFormData({ bloodGroup: 'O+', units: 10, expiryDate: '' })
+      setError(null)
       await fetchInventory()
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to save inventory')
+      setError(err.response?.data?.message || err.message || 'Failed to save inventory')
     }
   }
 
