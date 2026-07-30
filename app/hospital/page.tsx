@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Droplet, AlertCircle, Navigation, Zap, Send, AlertTriangle, TrendingUp, MapPin, Clock, Loader } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Heart, Bell, MapPin, History, AlertCircle, CheckCircle, Clock, Loader, X, Edit2, Trash2, Plus } from 'lucide-react'
 import DashboardLayout from '@/components/DashboardLayout'
 import StatCard from '@/components/StatCard'
 import Card from '@/components/Card'
@@ -9,383 +9,522 @@ import Table from '@/components/Table'
 import Badge from '@/components/Badge'
 import Alert from '@/components/Alert'
 import Button from '@/components/Button'
-import { useHospitalDashboardData } from '@/lib/useDashboardData'
+import { useApp } from '@/lib/AppContext'
+import { useFormState, useValidation, useToast, useTable, useGenerateId } from '@/lib/hooks'
 import { useAuth } from '@/lib/useAuth'
 
 const navItems = [
-  { label: 'Dashboard', href: '/hospital', icon: <Droplet className="h-5 w-5" />, isActive: true },
-  { label: 'Inventory', href: '/hospital/inventory', icon: <Zap className="h-5 w-5" /> },
+  { label: 'Dashboard', href: '/hospital', icon: <Heart className="h-5 w-5" />, isActive: true },
+  { label: 'Inventory', href: '/hospital/inventory', icon: <AlertCircle className="h-5 w-5" /> },
   { label: 'Requests', href: '/hospital/requests', icon: <AlertCircle className="h-5 w-5" /> },
-  { label: 'Analytics', href: '/hospital/analytics', icon: <Navigation className="h-5 w-5" /> },
 ]
+
+interface BloodRequestFormData {
+  bloodGroup: string
+  units: string
+  priority: string
+  notes: string
+}
+
+interface InventoryFormData {
+  bloodGroup: string
+  available: string
+  reserved: string
+}
+
+const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
 
 export default function HospitalDashboard() {
   const { user } = useAuth()
-  const { data, loading, error, refetch } = useHospitalDashboardData()
-  const [requestForm, setRequestForm] = useState({ bloodGroup: 'O+', units: 5, priority: 'Normal' })
+  const { bloodRequests, addBloodRequest, updateBloodRequest, deleteBloodRequest, bloodInventory, addBloodInventory, updateBloodInventory } = useApp()
+  const { addToast } = useToast()
+  const { validate } = useValidation()
+  const generateId = useGenerateId()
+  const tableState = useTable()
+
+  // Modal states
   const [showRequestForm, setShowRequestForm] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [editingRequestId, setEditingRequestId] = useState<string | null>(null)
+  const [showInventoryForm, setShowInventoryForm] = useState(false)
+  const [editingInventoryId, setEditingInventoryId] = useState<string | null>(null)
 
-  if (loading) {
-    return (
-      <DashboardLayout
-        title="Hospital Blood Management"
-        subtitle="Loading dashboard..."
-        userRole="Hospital Admin"
-        navItems={navItems}
-      >
-        <div className="flex justify-center items-center py-12">
-          <Loader className="h-8 w-8 animate-spin text-blood-600" />
-        </div>
-      </DashboardLayout>
-    )
-  }
+  // Request form
+  const requestForm = useFormState<BloodRequestFormData>({
+    bloodGroup: 'O+',
+    units: '5',
+    priority: 'Normal',
+    notes: '',
+  })
 
-  if (error) {
-    return (
-      <DashboardLayout
-        title="Hospital Blood Management"
-        subtitle="Error loading dashboard"
-        userRole="Hospital Admin"
-        navItems={navItems}
-      >
-        <Alert
-          type="danger"
-          title="Failed to load dashboard"
-          message={error}
-          className="mb-6"
-        />
-      </DashboardLayout>
-    )
-  }
+  // Inventory form
+  const inventoryForm = useFormState<InventoryFormData>({
+    bloodGroup: 'O+',
+    available: '10',
+    reserved: '0',
+  })
 
-  const inventory = data?.inventory || []
-  const emergencyRequests = data?.emergencyRequests || []
-  const nearbyBloodBanks = data?.nearbyBloodBanks || []
-  const recommendations = data?.recommendations?.recommendations || []
+  // Get hospital-specific data
+  const hospitalId = 'hospital-001'
+  const hospitalRequests = useMemo(() => {
+    return bloodRequests.filter(r => r.hospitalId === hospitalId)
+  }, [bloodRequests, hospitalId])
 
-  const totalInventory = inventory.reduce((sum, inv) => sum + (inv.available || 0), 0)
-  const totalReserved = inventory.reduce((sum, inv) => sum + (inv.reserved || 0), 0)
-  const totalExpiring = inventory.reduce((sum, inv) => sum + (inv.expiring || 0), 0)
+  const hospitalInventory = useMemo(() => {
+    return bloodInventory.filter(inv => inv.entityId === hospitalId && inv.entityType === 'hospital')
+  }, [bloodInventory, hospitalId])
 
-  const handleRequestSubmit = async () => {
-    setIsSubmitting(true)
-    try {
-      const { apiClient } = await import('@/lib/api')
-      await apiClient.createEmergencyRequest({
-        bloodGroup: requestForm.bloodGroup,
-        unitsNeeded: requestForm.units,
-        priority: requestForm.priority,
-        status: 'Pending',
+  // Search and filter
+  const filteredRequests = useMemo(() => {
+    let filtered = hospitalRequests
+
+    if (tableState.tableState.search) {
+      filtered = filtered.filter(r =>
+        r.bloodGroup.toLowerCase().includes(tableState.tableState.search.toLowerCase()) ||
+        r.priority.toLowerCase().includes(tableState.tableState.search.toLowerCase())
+      )
+    }
+
+    // Sort
+    if (tableState.tableState.sortBy) {
+      const key = tableState.tableState.sortBy as keyof typeof filtered[0]
+      filtered.sort((a, b) => {
+        const aVal = a[key]
+        const bVal = b[key]
+        const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+        return tableState.tableState.sortOrder === 'asc' ? cmp : -cmp
       })
-      setSubmitMessage({ type: 'success', text: 'Blood request submitted successfully!' })
+    }
+
+    return filtered
+  }, [hospitalRequests, tableState.tableState])
+
+  // Submit blood request
+  const handleSubmitRequest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    requestForm.setIsSubmitting(true)
+
+    const rules = {
+      bloodGroup: { required: true },
+      units: { required: true, pattern: /^\d+$/ },
+      priority: { required: true },
+    }
+
+    const errors = validate(requestForm.values, rules)
+    if (Object.keys(errors).length > 0) {
+      requestForm.setErrors(errors)
+      requestForm.setIsSubmitting(false)
+      addToast('Please fill all required fields', 'error')
+      return
+    }
+
+    try {
+      if (editingRequestId) {
+        updateBloodRequest(editingRequestId, {
+          bloodGroup: requestForm.values.bloodGroup,
+          unitsNeeded: parseInt(requestForm.values.units),
+          priority: requestForm.values.priority as 'Normal' | 'High' | 'Critical',
+          updatedAt: new Date().toISOString(),
+        })
+        addToast('Blood request updated successfully', 'success')
+        setEditingRequestId(null)
+      } else {
+        addBloodRequest({
+          id: generateId('req'),
+          hospitalId,
+          bloodGroup: requestForm.values.bloodGroup,
+          unitsNeeded: parseInt(requestForm.values.units),
+          priority: requestForm.values.priority as 'Normal' | 'High' | 'Critical',
+          status: 'Pending',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        addToast('Blood request created successfully', 'success')
+      }
+
+      requestForm.resetForm()
       setShowRequestForm(false)
-      setRequestForm({ bloodGroup: 'O+', units: 5, priority: 'Normal' })
-      setTimeout(() => {
-        refetch()
-        setSubmitMessage(null)
-      }, 1000)
-    } catch (err: any) {
-      setSubmitMessage({ type: 'error', text: err.message || 'Failed to submit request' })
     } finally {
-      setIsSubmitting(false)
+      requestForm.setIsSubmitting(false)
     }
   }
 
-  const handleFulfillRequest = async (requestId: string) => {
-    try {
-      const { apiClient } = await import('@/lib/api')
-      await apiClient.updateEmergencyStatus(requestId, 'Fulfilled')
-      setSubmitMessage({ type: 'success', text: 'Request fulfilled successfully!' })
-      setTimeout(() => {
-        refetch()
-        setSubmitMessage(null)
-      }, 1000)
-    } catch (err: any) {
-      setSubmitMessage({ type: 'error', text: err.message || 'Failed to fulfill request' })
+  // Edit request
+  const handleEditRequest = (id: string) => {
+    const request = hospitalRequests.find(r => r.id === id)
+    if (request) {
+      requestForm.setFieldValue('bloodGroup', request.bloodGroup)
+      requestForm.setFieldValue('units', request.unitsNeeded.toString())
+      requestForm.setFieldValue('priority', request.priority)
+      setEditingRequestId(id)
+      setShowRequestForm(true)
     }
   }
 
-  const handleAcceptRecommendation = async (recId: string) => {
-    try {
-      setSubmitMessage({ type: 'success', text: 'Recommendation accepted!' })
-      setTimeout(() => {
-        setSubmitMessage(null)
-      }, 1000)
-    } catch (err: any) {
-      setSubmitMessage({ type: 'error', text: err.message || 'Failed to accept recommendation' })
+  // Delete request
+  const handleDeleteRequest = (id: string) => {
+    if (confirm('Are you sure you want to delete this request?')) {
+      deleteBloodRequest(id)
+      addToast('Blood request deleted successfully', 'success')
     }
   }
 
-  const handleRequestFromBank = async (bankId: string) => {
+  // Update inventory
+  const handleUpdateInventory = async (e: React.FormEvent) => {
+    e.preventDefault()
+    inventoryForm.setIsSubmitting(true)
+
     try {
-      setSubmitMessage({ type: 'success', text: 'Request sent to blood bank!' })
-      setTimeout(() => {
-        setSubmitMessage(null)
-      }, 1000)
-    } catch (err: any) {
-      setSubmitMessage({ type: 'error', text: err.message || 'Failed to send request' })
+      const rules = {
+        available: { required: true, pattern: /^\d+$/ },
+        reserved: { required: true, pattern: /^\d+$/ },
+      }
+
+      const errors = validate(inventoryForm.values, rules)
+      if (Object.keys(errors).length > 0) {
+        inventoryForm.setErrors(errors)
+        inventoryForm.setIsSubmitting(false)
+        addToast('Please fill all required fields', 'error')
+        return
+      }
+
+      if (editingInventoryId) {
+        updateBloodInventory(editingInventoryId, {
+          available: parseInt(inventoryForm.values.available),
+          reserved: parseInt(inventoryForm.values.reserved),
+        })
+        addToast('Inventory updated successfully', 'success')
+        setEditingInventoryId(null)
+      }
+
+      inventoryForm.resetForm()
+      setShowInventoryForm(false)
+    } finally {
+      inventoryForm.setIsSubmitting(false)
     }
   }
+
+  // Edit inventory
+  const handleEditInventory = (id: string) => {
+    const inv = hospitalInventory.find(i => i.id === id)
+    if (inv) {
+      inventoryForm.setFieldValue('bloodGroup', inv.bloodGroup)
+      inventoryForm.setFieldValue('available', inv.available.toString())
+      inventoryForm.setFieldValue('reserved', inv.reserved.toString())
+      setEditingInventoryId(id)
+      setShowInventoryForm(true)
+    }
+  }
+
+  // Stats
+  const totalInventory = hospitalInventory.reduce((sum, inv) => sum + inv.available, 0)
+  const totalReserved = hospitalInventory.reduce((sum, inv) => sum + inv.reserved, 0)
+  const pendingRequests = hospitalRequests.filter(r => r.status === 'Pending').length
 
   return (
     <DashboardLayout
       title="Hospital Blood Management"
-      subtitle={`${user?.name || 'Hospital'} - Real-time blood inventory and request management`}
+      subtitle="Manage blood inventory and requests"
       userRole="Hospital Admin"
       navItems={navItems}
     >
-      {/* Submit Message Alert */}
-      {submitMessage && (
-        <Alert
-          type={submitMessage.type}
-          title={submitMessage.type === 'success' ? 'Success' : 'Error'}
-          message={submitMessage.text}
-          className="mb-6"
-        />
-      )}
-
-      {/* Critical Alert */}
-      {totalExpiring > 0 && (
-        <Alert
-          type="danger"
-          title="Critical: Blood Shortage Alert"
-          message={`O- blood at critical level. ${totalExpiring} units expiring soon. Immediate action required.`}
-          className="mb-6"
-        />
-      )}
-
-      {/* Key Stats */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Stats */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
         <StatCard
-          label="Available Units"
+          label="Total Inventory"
           value={totalInventory}
-          icon={<Droplet className="h-6 w-6" />}
+          unit="units"
+          icon={<Heart className="h-6 w-6" />}
           color="blood"
-          trend={{ value: 5, direction: 'up' }}
         />
         <StatCard
           label="Reserved Units"
           value={totalReserved}
+          unit="units"
           icon={<AlertCircle className="h-6 w-6" />}
           color="amber"
         />
         <StatCard
-          label="Units Expiring Soon"
-          value={totalExpiring}
-          icon={<AlertTriangle className="h-6 w-6" />}
+          label="Pending Requests"
+          value={pendingRequests}
+          icon={<Clock className="h-6 w-6" />}
           color="blue"
         />
         <StatCard
-          label="Blood Groups"
-          value={inventory.length}
-          icon={<Droplet className="h-6 w-6" />}
+          label="Available"
+          value={totalInventory - totalReserved}
+          unit="units"
+          icon={<CheckCircle className="h-6 w-6" />}
           color="green"
         />
       </div>
 
-      {/* Inventory Section */}
-      <Card className="mb-8">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">📦 Blood Inventory</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {inventory.map((inv) => (
-            <div key={inv.id} className="rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
-              <p className="text-2xl font-bold text-blood-600">{inv.bloodGroup}</p>
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Available</span>
-                  <span className="font-semibold text-green-600">{inv.available}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Reserved</span>
-                  <span className="font-semibold text-gray-900">{inv.reserved}</span>
-                </div>
-                {inv.expiring > 0 && (
-                  <div className="flex justify-between border-t border-gray-100 pt-2">
-                    <span className="text-gray-600">Expiring</span>
-                    <span className="font-semibold text-red-600">{inv.expiring}</span>
-                  </div>
-                )}
-              </div>
+      {/* Blood Requests Section */}
+      <div className="mb-8">
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900">Blood Requests</h2>
+          <Button
+            onClick={() => {
+              requestForm.resetForm()
+              setEditingRequestId(null)
+              setShowRequestForm(true)
+            }}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Raise Request
+          </Button>
+        </div>
+
+        {/* Request Form Modal */}
+        {showRequestForm && (
+          <Card className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">
+                {editingRequestId ? 'Edit Blood Request' : 'Raise Blood Request'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowRequestForm(false)
+                  requestForm.resetForm()
+                  setEditingRequestId(null)
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-          ))}
-        </div>
-      </Card>
 
-      {/* Raise Blood Request Section */}
-      <Card className="mb-8">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">🆘 Raise Blood Request</h2>
-          {!showRequestForm && (
-            <Button size="sm" onClick={() => setShowRequestForm(true)}>
-              + New Request
-            </Button>
-          )}
-        </div>
-
-        {showRequestForm ? (
-          <div className="mt-6 space-y-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <div className="grid gap-4 md:grid-cols-3">
+            <form onSubmit={handleSubmitRequest} className="space-y-4">
+              {/* Blood Group */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Blood Group</label>
                 <select
-                  value={requestForm.bloodGroup}
-                  onChange={(e) => setRequestForm({ ...requestForm, bloodGroup: e.target.value })}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+                  name="bloodGroup"
+                  value={requestForm.values.bloodGroup}
+                  onChange={requestForm.handleChange}
+                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blood-600 focus:outline-none"
                 >
-                  {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((bg) => (
-                    <option key={bg} value={bg}>
-                      {bg}
-                    </option>
+                  {bloodGroups.map(bg => (
+                    <option key={bg} value={bg}>{bg}</option>
                   ))}
                 </select>
+                {requestForm.errors.bloodGroup && (
+                  <p className="mt-1 text-sm text-red-600">{requestForm.errors.bloodGroup}</p>
+                )}
               </div>
+
+              {/* Units */}
               <div>
-                <label className="block text-sm font-medium text-gray-700">Units Required</label>
+                <label className="block text-sm font-medium text-gray-700">Units Needed</label>
                 <input
                   type="number"
+                  name="units"
                   min="1"
-                  max="50"
-                  value={requestForm.units}
-                  onChange={(e) => setRequestForm({ ...requestForm, units: parseInt(e.target.value) })}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+                  max="100"
+                  value={requestForm.values.units}
+                  onChange={requestForm.handleChange}
+                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blood-600 focus:outline-none"
+                  placeholder="Enter number of units"
                 />
+                {requestForm.errors.units && (
+                  <p className="mt-1 text-sm text-red-600">{requestForm.errors.units}</p>
+                )}
               </div>
+
+              {/* Priority */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Priority</label>
                 <select
-                  value={requestForm.priority}
-                  onChange={(e) => setRequestForm({ ...requestForm, priority: e.target.value })}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+                  name="priority"
+                  value={requestForm.values.priority}
+                  onChange={requestForm.handleChange}
+                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blood-600 focus:outline-none"
                 >
-                  <option>Normal</option>
-                  <option>High</option>
-                  <option>Emergency</option>
+                  <option value="Normal">Normal</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
                 </select>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <Button size="sm" onClick={handleRequestSubmit} disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <span className="flex items-center gap-2">
-                    <Loader className="h-4 w-4 animate-spin" /> Submitting...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <Send className="h-4 w-4" /> Submit Request
-                  </span>
+                {requestForm.errors.priority && (
+                  <p className="mt-1 text-sm text-red-600">{requestForm.errors.priority}</p>
                 )}
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => setShowRequestForm(false)} disabled={isSubmitting}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <p className="mt-4 text-gray-600">Click "New Request" to submit a blood request</p>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Notes (Optional)</label>
+                <textarea
+                  name="notes"
+                  value={requestForm.values.notes}
+                  onChange={requestForm.handleChange}
+                  rows={3}
+                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blood-600 focus:outline-none"
+                  placeholder="Add any additional notes"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-4">
+                <Button
+                  type="submit"
+                  disabled={requestForm.isSubmitting}
+                  className="flex-1"
+                >
+                  {requestForm.isSubmitting ? 'Saving...' : editingRequestId ? 'Update Request' : 'Create Request'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowRequestForm(false)
+                    requestForm.resetForm()
+                    setEditingRequestId(null)
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </Card>
         )}
-      </Card>
 
-      {/* Emergency Requests Section */}
-      <Card className="mb-8">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">🚨 Emergency Requests In Progress</h2>
-        <div className="space-y-3">
-          {emergencyRequests.length === 0 ? (
-            <p className="text-gray-600">No emergency requests in progress</p>
-          ) : (
-            emergencyRequests.map((req: any) => (
-              <div key={req._id || req.id} className="rounded-lg border-l-4 border-l-red-600 bg-red-50 p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-gray-900">{req.bloodGroup} Blood Needed</p>
-                      <Badge variant="danger">{req.unitsNeeded} units</Badge>
-                    </div>
-                    <div className="mt-2 grid gap-2 text-sm text-gray-600 md:grid-cols-3">
-                      <div className="flex items-center gap-1">
-                        <AlertCircle className="h-4 w-4" />
-                        <span>{req.hospital?.name || 'Hospital'}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        <span>Status: {req.status}</span>
-                      </div>
-                      <div>
-                        <Badge variant="warning">{req.priority}</Badge>
-                      </div>
-                    </div>
-                  </div>
-                  <Button size="sm" variant="danger" onClick={() => handleFulfillRequest(req._id || req.id)}>
-                    Fulfill
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </Card>
+        {/* Requests Table */}
+        <Card>
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Search by blood group or priority..."
+              value={tableState.tableState.search}
+              onChange={(e) => tableState.setSearch(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2"
+            />
+          </div>
 
-      {/* AI Recommendations Section */}
-      <Card className="mb-8">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">🤖 AI Recommendations</h2>
-        <div className="space-y-3">
-          {recommendations.length === 0 ? (
-            <p className="text-gray-600">No recommendations at this time</p>
-          ) : (
-            recommendations.map((rec: any, idx: number) => (
-              <div
-                key={rec.id || idx}
-                className={`rounded-lg border-l-4 p-4 ${
-                  rec.priority === 'Critical' || rec.urgency === 'critical'
-                    ? 'border-l-red-600 bg-red-50'
-                    : rec.priority === 'High' || rec.urgency === 'high'
-                      ? 'border-l-amber-600 bg-amber-50'
-                      : 'border-l-blue-600 bg-blue-50'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-gray-900">{rec.title || rec.reason}</p>
-                      <Badge variant={rec.priority === 'Critical' ? 'danger' : rec.priority === 'High' ? 'warning' : 'info'}>
-                        {rec.confidence || 'N/A'}% confident
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-gray-600">{rec.reason || rec.description}</p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm font-medium text-gray-900">{rec.action || 'Review recommendation'}</span>
-                    </div>
-                  </div>
-                  <Button size="sm" onClick={() => handleAcceptRecommendation(rec.id || idx.toString())}>Accept</Button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </Card>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900 cursor-pointer" onClick={() => tableState.setSort('bloodGroup')}>
+                    Blood Group
+                  </th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900 cursor-pointer" onClick={() => tableState.setSort('unitsNeeded')}>
+                    Units
+                  </th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900 cursor-pointer" onClick={() => tableState.setSort('priority')}>
+                    Priority
+                  </th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900 cursor-pointer" onClick={() => tableState.setSort('status')}>
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900">Created</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                      No requests found
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRequests.map(request => (
+                    <tr key={request.id} className="border-b border-gray-200 hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium text-gray-900">{request.bloodGroup}</td>
+                      <td className="px-4 py-3 text-gray-600">{request.unitsNeeded}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={request.priority === 'Critical' ? 'danger' : request.priority === 'High' ? 'warning' : 'info'}>
+                          {request.priority}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={request.status === 'Fulfilled' ? 'success' : request.status === 'Cancelled' ? 'danger' : 'warning'}>
+                          {request.status}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 text-xs">{new Date(request.createdAt).toLocaleDateString()}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEditRequest(request.id)}
+                            className="text-blue-600 hover:text-blue-800"
+                            title="Edit"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRequest(request.id)}
+                            className="text-red-600 hover:text-red-800"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
 
-      {/* Nearby Blood Banks */}
-      <Card>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">🏦 Nearby Blood Banks</h2>
-        <div className="grid gap-3 md:grid-cols-2">
-          {nearbyBloodBanks.map((bank) => (
-            <div key={bank.id} className="rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-900">{bank.name}</p>
-                  <div className="mt-2 flex items-center gap-1 text-sm text-gray-600">
-                    <MapPin className="h-4 w-4" />
-                    <span>{bank.distance}</span>
-                  </div>
-                </div>
-                <Button size="sm" onClick={() => handleRequestFromBank(bank.id)}>Request</Button>
-              </div>
-            </div>
-          ))}
+      {/* Blood Inventory Section */}
+      <div>
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900">Blood Inventory</h2>
         </div>
-      </Card>
+
+        <Card>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900">Blood Group</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900">Total Units</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900">Available</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900">Reserved</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900">Status</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {hospitalInventory.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                      No inventory data
+                    </td>
+                  </tr>
+                ) : (
+                  hospitalInventory.map(inv => (
+                    <tr key={inv.id} className="border-b border-gray-200 hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium text-gray-900">{inv.bloodGroup}</td>
+                      <td className="px-4 py-3 text-gray-600">{inv.total}</td>
+                      <td className="px-4 py-3 text-gray-600">{inv.available}</td>
+                      <td className="px-4 py-3 text-gray-600">{inv.reserved}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={inv.available < 5 ? 'danger' : inv.available < 10 ? 'warning' : 'success'}>
+                          {inv.available < 5 ? 'Critical' : inv.available < 10 ? 'Low' : 'Healthy'}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleEditInventory(inv.id)}
+                          className="text-blue-600 hover:text-blue-800"
+                          title="Edit"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
     </DashboardLayout>
   )
 }

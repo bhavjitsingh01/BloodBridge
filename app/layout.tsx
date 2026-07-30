@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { SocketProvider } from '@/lib/SocketProvider'
+import { AppProvider } from '@/lib/AppContext'
 
 export const metadata: Metadata = {
   title: 'BloodBridge - AI-Powered Blood Supply Network',
@@ -16,7 +17,9 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <SocketProvider>
-          {children}
+          <AppProvider>
+            {children}
+          </AppProvider>
         </SocketProvider>
       </body>
     </html>
