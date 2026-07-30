@@ -41,7 +41,7 @@ export default function HospitalInventory() {
   const [filterBloodGroup, setFilterBloodGroup] = useState('all')
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [formData, setFormData] = useState({ bloodGroup: 'O+', units: 5 })
+  const [formData, setFormData] = useState({ bloodGroup: 'O+', units: 5, expiryDate: '' })
 
   useEffect(() => {
     fetchInventory()
@@ -70,14 +70,19 @@ export default function HospitalInventory() {
 
   const handleAddOrUpdate = async () => {
     try {
+      const payload = {
+        ...formData,
+        hospitalId: user?.id || '',
+        collectionDate: new Date().toISOString().split('T')[0],
+      }
       if (editingId) {
-        await apiClient.updateInventory(editingId, formData)
+        await apiClient.updateInventory(editingId, payload)
       } else {
-        await apiClient.createInventory(formData)
+        await apiClient.createInventory(payload)
       }
       setShowAddForm(false)
       setEditingId(null)
-      setFormData({ bloodGroup: 'O+', units: 5 })
+      setFormData({ bloodGroup: 'O+', units: 5, expiryDate: '' })
       await fetchInventory()
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to save inventory')
@@ -222,7 +227,7 @@ export default function HospitalInventory() {
           <Button
             onClick={() => {
               setEditingId(null)
-              setFormData({ bloodGroup: 'O+', units: 5 })
+              setFormData({ bloodGroup: 'O+', units: 5, expiryDate: '' })
               setShowAddForm(true)
             }}
             className="flex items-center gap-2"
@@ -237,7 +242,7 @@ export default function HospitalInventory() {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
             {editingId ? 'Edit Inventory' : 'Add New Inventory'}
           </h3>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Blood Group</label>
               <select
@@ -259,6 +264,15 @@ export default function HospitalInventory() {
                 min="1"
                 value={formData.units}
                 onChange={(e) => setFormData({ ...formData, units: parseInt(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Expiry Date</label>
+              <input
+                type="date"
+                value={formData.expiryDate}
+                onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
               />
             </div>

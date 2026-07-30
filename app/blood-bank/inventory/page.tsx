@@ -40,7 +40,7 @@ export default function BloodBankInventory() {
   const [filterBloodGroup, setFilterBloodGroup] = useState('all')
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [formData, setFormData] = useState({ bloodGroup: 'O+', quantity: 10, expiryDate: '' })
+  const [formData, setFormData] = useState({ bloodGroup: 'O+', units: 10, expiryDate: '' })
 
   useEffect(() => {
     fetchInventory()
@@ -69,14 +69,19 @@ export default function BloodBankInventory() {
 
   const handleAddOrUpdate = async () => {
     try {
+      const payload = {
+        ...formData,
+        hospitalId: user?.id || '',
+        collectionDate: new Date().toISOString().split('T')[0],
+      }
       if (editingId) {
-        await apiClient.updateInventory(editingId, formData)
+        await apiClient.updateInventory(editingId, payload)
       } else {
-        await apiClient.createInventory(formData)
+        await apiClient.createInventory(payload)
       }
       setShowAddForm(false)
       setEditingId(null)
-      setFormData({ bloodGroup: 'O+', quantity: 10, expiryDate: '' })
+      setFormData({ bloodGroup: 'O+', units: 10, expiryDate: '' })
       await fetchInventory()
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to save inventory')
@@ -98,7 +103,7 @@ export default function BloodBankInventory() {
     setEditingId(item.id || item._id || '')
     setFormData({
       bloodGroup: item.bloodGroup,
-      quantity: item.available,
+      units: item.available,
       expiryDate: item.expiryDate || '',
     })
     setShowAddForm(true)
@@ -275,7 +280,7 @@ export default function BloodBankInventory() {
           <Button
             onClick={() => {
               setEditingId(null)
-              setFormData({ bloodGroup: 'O+', quantity: 10, expiryDate: '' })
+              setFormData({ bloodGroup: 'O+', units: 10, expiryDate: '' })
               setShowAddForm(true)
             }}
             className="flex items-center gap-2"
@@ -306,12 +311,12 @@ export default function BloodBankInventory() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Units</label>
               <input
                 type="number"
                 min="1"
-                value={formData.quantity}
-                onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })}
+                value={formData.units}
+                onChange={(e) => setFormData({ ...formData, units: parseInt(e.target.value) })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
               />
             </div>
