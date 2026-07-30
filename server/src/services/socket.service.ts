@@ -69,10 +69,20 @@ export class SocketService {
   private setupHospitalNamespace(): void {
     const hospitalNS = this.io.of('/hospital');
 
+    // Authenticate namespace connections
+    hospitalNS.use((socket, next) => {
+      const user = socket.handshake.auth.user;
+      if (!user || user.role !== 'Hospital') {
+        return next(new Error('Only Hospital users can access this namespace'));
+      }
+      socket.data.user = user;
+      next();
+    });
+
     hospitalNS.on('connection', (socket) => {
       const user = socket.data.user as SocketUser;
 
-      if (user.role !== 'Hospital') {
+      if (!user) {
         socket.disconnect();
         return;
       }
@@ -93,10 +103,20 @@ export class SocketService {
   private setupBloodBankNamespace(): void {
     const bloodBankNS = this.io.of('/blood-bank');
 
+    // Authenticate namespace connections
+    bloodBankNS.use((socket, next) => {
+      const user = socket.handshake.auth.user;
+      if (!user || user.role !== 'BloodBank') {
+        return next(new Error('Only BloodBank users can access this namespace'));
+      }
+      socket.data.user = user;
+      next();
+    });
+
     bloodBankNS.on('connection', (socket) => {
       const user = socket.data.user as SocketUser;
 
-      if (user.role !== 'BloodBank') {
+      if (!user) {
         socket.disconnect();
         return;
       }
@@ -117,10 +137,20 @@ export class SocketService {
   private setupDonorNamespace(): void {
     const donorNS = this.io.of('/donor');
 
+    // Authenticate namespace connections
+    donorNS.use((socket, next) => {
+      const user = socket.handshake.auth.user;
+      if (!user || user.role !== 'Donor') {
+        return next(new Error('Only Donor users can access this namespace'));
+      }
+      socket.data.user = user;
+      next();
+    });
+
     donorNS.on('connection', (socket) => {
       const user = socket.data.user as SocketUser;
 
-      if (user.role !== 'Donor') {
+      if (!user) {
         socket.disconnect();
         return;
       }
@@ -140,10 +170,20 @@ export class SocketService {
   private setupAdminNamespace(): void {
     const adminNS = this.io.of('/admin');
 
+    // Authenticate namespace connections
+    adminNS.use((socket, next) => {
+      const user = socket.handshake.auth.user;
+      if (!user || user.role !== 'Admin') {
+        return next(new Error('Only Admin users can access this namespace'));
+      }
+      socket.data.user = user;
+      next();
+    });
+
     adminNS.on('connection', (socket) => {
       const user = socket.data.user as SocketUser;
 
-      if (user.role !== 'Admin') {
+      if (!user) {
         socket.disconnect();
         return;
       }
