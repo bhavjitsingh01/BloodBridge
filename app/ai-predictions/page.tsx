@@ -1,303 +1,257 @@
 'use client'
 
-import { Brain, TrendingUp, AlertCircle, BarChart3, Loader } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Brain, RefreshCw } from 'lucide-react'
 import DashboardLayout from '@/components/DashboardLayout'
+import StatCard from '@/components/StatCard'
 import Card from '@/components/Card'
-import Alert from '@/components/Alert'
-import { useHospitalDashboardData } from '@/lib/useDashboardData'
+import Button from '@/components/Button'
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
+  LineChart,
+  Line,
+  ComposedChart,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ComposedChart,
 } from 'recharts'
+import { mockAIPredictionData } from '@/lib/mockData'
 
-const navItems = [
-  { label: 'Dashboard', href: '/ai-predictions', icon: <Brain className="h-5 w-5" />, isActive: true },
-]
+const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
+const states = ['Delhi', 'Mumbai', 'Bangalore', 'Kolkata', 'Chennai']
+const timeRanges = ['7 Days', '14 Days', '30 Days']
 
-const colors = {
-  O_positive: '#dc2626',
-  O_negative: '#991b1b',
-  A_positive: '#2563eb',
-  A_negative: '#1e40af',
-  B_positive: '#059669',
-  B_negative: '#065f46',
-  AB_positive: '#7c3aed',
-  AB_negative: '#5b21b6',
-}
+export default function AIPredictionsPage() {
+  const [selectedBloodGroup, setSelectedBloodGroup] = useState<string | null>(null)
+  const [selectedState, setSelectedState] = useState<string | null>(null)
+  const [timeRange, setTimeRange] = useState('7 Days')
+  const [refreshing, setRefreshing] = useState(false)
 
-export default function AIPredictionDashboard() {
-  const { data, loading, error } = useHospitalDashboardData()
+  const { bloodShortagePrediction, demandPrediction, supplyVsDemand } = mockAIPredictionData
 
-  if (loading) {
-    return (
-      <DashboardLayout
-        title="AI Prediction Dashboard"
-        subtitle="Loading predictions..."
-        userRole="AI Analytics"
-        navItems={navItems}
-      >
-        <div className="flex justify-center items-center py-12">
-          <Loader className="h-8 w-8 animate-spin text-blood-600" />
-        </div>
-      </DashboardLayout>
-    )
+  // Filter data based on selections
+  const filteredShortageData = useMemo(() => {
+    let data = bloodShortagePrediction
+    if (selectedBloodGroup) {
+      data = data.filter(d => d.name === selectedBloodGroup)
+    }
+    return data
+  }, [selectedBloodGroup, bloodShortagePrediction])
+
+  const filteredDemandData = useMemo(() => {
+    let data = demandPrediction.slice(0, timeRange === '7 Days' ? 7 : timeRange === '14 Days' ? 14 : 30)
+    return data
+  }, [timeRange, demandPrediction])
+
+  const filteredSupplyVsDemandData = useMemo(() => {
+    let data = supplyVsDemand.slice(0, timeRange === '7 Days' ? 7 : timeRange === '14 Days' ? 14 : 30)
+    return data
+  }, [timeRange, supplyVsDemand])
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    setRefreshing(false)
   }
 
-  if (error) {
-    return (
-      <DashboardLayout
-        title="AI Prediction Dashboard"
-        subtitle="Error loading predictions"
-        userRole="AI Analytics"
-        navItems={navItems}
-      >
-        <Alert
-          type="danger"
-          title="Failed to load predictions"
-          message={error}
-          className="mb-6"
-        />
-      </DashboardLayout>
-    )
-  }
-
-  const inventory = data?.inventory || []
-  const shortages = data?.shortages || {}
-  const expiryRisks = data?.expiryRisks || {}
-
-  // Transform inventory data for shortage prediction
-  const bloodShortagePrediction = inventory.map((inv: any) => ({
-    bloodGroup: inv.bloodGroup,
-    currentUnits: inv.available || 0,
-    minRequired: 20,
-    daysUntilShortage: Math.floor(Math.random() * 14) + 1,
-    riskLevel: (inv.available || 0) === 0 ? 'Critical' : (inv.available || 0) < 10 ? 'Moderate' : 'Low'
-  }))
-
-  // Create demand prediction data (7 days)
-  const demandPrediction = Array.from({ length: 7 }, (_, i) => ({
-    date: new Date(Date.now() + i * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    O_positive: Math.floor(Math.random() * 50) + 20,
-    O_negative: Math.floor(Math.random() * 30) + 10,
-    A_positive: Math.floor(Math.random() * 40) + 15,
-    A_negative: Math.floor(Math.random() * 25) + 8,
-    B_positive: Math.floor(Math.random() * 35) + 12,
-    B_negative: Math.floor(Math.random() * 20) + 6,
-  }))
-
-  // Create expiry prediction
-  const expiryPrediction = Array.from({ length: 7 }, (_, i) => ({
-    date: new Date(Date.now() + i * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    O_positive: Math.floor(Math.random() * 15),
-    A_positive: Math.floor(Math.random() * 12),
-    B_positive: Math.floor(Math.random() * 10),
-    AB_positive: Math.floor(Math.random() * 5),
-  }))
-
-  // Supply vs demand
-  const supplyVsDemand = inventory.map((inv: any) => ({
-    bloodGroup: inv.bloodGroup,
-    supply: inv.available || 0,
-    demand: Math.floor(Math.random() * 40) + 10,
-    balance: (inv.available || 0) - (Math.floor(Math.random() * 40) + 10)
-  }))
+  // Stats
+  const criticalShortages = bloodShortagePrediction.filter(d => d.risk === 'Critical').length
+  const avgDemand = Math.round(demandPrediction.reduce((sum, d) => sum + d.demand, 0) / demandPrediction.length)
+  const accuracyRate = '92.5%'
 
   return (
     <DashboardLayout
-      title="AI Prediction Dashboard"
-      subtitle="Intelligent forecasting for blood supply management"
-      userRole="AI Analytics"
-      navItems={navItems}
+      title="AI Predictions Dashboard"
+      subtitle="Machine learning powered blood supply forecasting"
+      userRole="Admin"
+      navItems={[
+        { label: 'Dashboard', href: '/ai-predictions', icon: <Brain className="h-5 w-5" />, isActive: true },
+      ]}
     >
-      {/* Blood Shortage Prediction */}
-      <Card className="mb-8">
-        <div className="mb-6 flex items-center gap-2">
-          <AlertCircle className="h-6 w-6 text-red-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Blood Shortage Prediction</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={bloodShortagePrediction}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="bloodGroup" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="currentUnits" fill="#3b82f6" name="Current Units" />
-              <Bar dataKey="minRequired" fill="#ef4444" name="Min Required" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="mt-6 grid gap-4 md:grid-cols-5">
-          {bloodShortagePrediction.map((item) => (
-            <div
-              key={item.bloodGroup}
-              className={`rounded-lg p-4 ${
-                item.riskLevel === 'Critical'
-                  ? 'bg-red-50 border border-red-200'
-                  : item.riskLevel === 'Moderate'
-                    ? 'bg-yellow-50 border border-yellow-200'
-                    : item.riskLevel === 'Low'
-                      ? 'bg-blue-50 border border-blue-200'
-                      : 'bg-green-50 border border-green-200'
-              }`}
-            >
-              <p className="font-semibold text-gray-900">{item.bloodGroup}</p>
-              <p className="mt-2 text-sm text-gray-600">Current: {item.currentUnits} units</p>
-              <p className="text-sm text-gray-600">Min: {item.minRequired} units</p>
-              <p className="mt-2 text-xs font-semibold text-gray-700">
-                Shortage in {item.daysUntilShortage} days
-              </p>
-              <span
-                className={`mt-2 inline-block rounded-full px-2 py-1 text-xs font-semibold ${
-                  item.riskLevel === 'Critical'
-                    ? 'bg-red-100 text-red-800'
-                    : item.riskLevel === 'Moderate'
-                      ? 'bg-yellow-100 text-yellow-800'
-                      : item.riskLevel === 'Low'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-green-100 text-green-800'
-                }`}
-              >
-                {item.riskLevel}
-              </span>
-            </div>
-          ))}
-        </div>
-      </Card>
+      {/* Stats */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+        <StatCard
+          label="Critical Shortages"
+          value={criticalShortages}
+          icon={<Brain className="h-6 w-6" />}
+          color="red"
+        />
+        <StatCard
+          label="Average Daily Demand"
+          value={avgDemand}
+          unit="units"
+          icon={<Brain className="h-6 w-6" />}
+          color="blood"
+        />
+        <StatCard
+          label="Forecast Accuracy"
+          value={accuracyRate}
+          icon={<Brain className="h-6 w-6" />}
+          color="green"
+        />
+        <StatCard
+          label="Next Prediction"
+          value="Today"
+          icon={<Brain className="h-6 w-6" />}
+          color="blue"
+        />
+      </div>
 
-      {/* Demand Prediction */}
+      {/* Filters */}
       <Card className="mb-8">
-        <div className="mb-6 flex items-center gap-2">
-          <TrendingUp className="h-6 w-6 text-blue-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Demand Prediction (7-Day Forecast)</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={demandPrediction}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="O_positive" stroke={colors.O_positive} name="O+" />
-              <Line type="monotone" dataKey="O_negative" stroke={colors.O_negative} name="O-" />
-              <Line type="monotone" dataKey="A_positive" stroke={colors.A_positive} name="A+" />
-              <Line type="monotone" dataKey="A_negative" stroke={colors.A_negative} name="A-" />
-              <Line type="monotone" dataKey="B_positive" stroke={colors.B_positive} name="B+" />
-              <Line type="monotone" dataKey="B_negative" stroke={colors.B_negative} name="B-" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
-
-      {/* Expiry Prediction */}
-      <Card className="mb-8">
-        <div className="mb-6 flex items-center gap-2">
-          <AlertCircle className="h-6 w-6 text-amber-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Blood Expiry Prediction</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={expiryPrediction}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="O_positive"
-                stroke="#dc2626"
-                name="O+ Expiring"
-                strokeWidth={2}
-              />
-              <Line
-                type="monotone"
-                dataKey="A_positive"
-                stroke="#2563eb"
-                name="A+ Expiring"
-                strokeWidth={2}
-              />
-              <Line
-                type="monotone"
-                dataKey="B_positive"
-                stroke="#059669"
-                name="B+ Expiring"
-                strokeWidth={2}
-              />
-              <Line
-                type="monotone"
-                dataKey="AB_positive"
-                stroke="#7c3aed"
-                name="AB+ Expiring"
-                strokeWidth={2}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
-
-      {/* Supply vs Demand */}
-      <Card>
-        <div className="mb-6 flex items-center gap-2">
-          <BarChart3 className="h-6 w-6 text-green-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Supply vs Demand Analysis</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={supplyVsDemand}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="bloodGroup" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="supply" fill="#10b981" name="Supply" />
-              <Bar dataKey="demand" fill="#f59e0b" name="Demand" />
-              <Line
-                type="monotone"
-                dataKey="balance"
-                stroke="#3b82f6"
-                name="Balance"
-                strokeWidth={2}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="mt-6 grid gap-4 md:grid-cols-4">
-          {supplyVsDemand.map((item) => (
-            <div key={item.bloodGroup} className="rounded-lg border border-gray-200 p-4">
-              <p className="font-semibold text-gray-900">{item.bloodGroup}</p>
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Supply:</span>
-                  <span className="font-semibold text-green-600">{item.supply}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Demand:</span>
-                  <span className="font-semibold text-amber-600">{item.demand}</span>
-                </div>
-                <div className="border-t border-gray-100 pt-2 flex justify-between">
-                  <span className="text-gray-600">Balance:</span>
-                  <span
-                    className={`font-semibold ${item.balance > 50 ? 'text-green-600' : 'text-orange-600'}`}
+        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Time Range</label>
+              <div className="flex gap-2">
+                {timeRanges.map(range => (
+                  <Button
+                    key={range}
+                    onClick={() => setTimeRange(range)}
+                    variant={timeRange === range ? 'default' : 'secondary'}
+                    className="text-sm"
                   >
-                    {item.balance > 0 ? '+' : ''}
-                    {item.balance}
-                  </span>
-                </div>
+                    {range}
+                  </Button>
+                ))}
               </div>
             </div>
-          ))}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Blood Group</label>
+                <select
+                  value={selectedBloodGroup || ''}
+                  onChange={(e) => setSelectedBloodGroup(e.target.value || null)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="">All Blood Groups</option>
+                  {bloodGroups.map(bg => (
+                    <option key={bg} value={bg}>{bg}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
+                <select
+                  value={selectedState || ''}
+                  onChange={(e) => setSelectedState(e.target.value || null)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="">All States</option>
+                  {states.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <Button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 whitespace-nowrap"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh Data'}
+          </Button>
+        </div>
+      </Card>
+
+      {/* Charts */}
+      <div className="grid gap-8 mb-8">
+        {/* Blood Shortage Prediction */}
+        <Card>
+          <h3 className="mb-4 text-lg font-bold text-gray-900">Blood Shortage Prediction</h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={filteredShortageData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="shortage" fill="#8884d8" name="Shortage Risk (%)" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        {/* Demand Prediction */}
+        <Card>
+          <h3 className="mb-4 text-lg font-bold text-gray-900">Demand Prediction ({timeRange})</h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={filteredDemandData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="day" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="demand" stroke="#dc2626" name="Predicted Demand" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        {/* Expiry Prediction */}
+        <Card>
+          <h3 className="mb-4 text-lg font-bold text-gray-900">Expiry Prediction ({timeRange})</h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={filteredDemandData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="day" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="expiry" stroke="#f97316" name="Expiring Units" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        {/* Supply vs Demand */}
+        <Card>
+          <h3 className="mb-4 text-lg font-bold text-gray-900">Supply vs Demand ({timeRange})</h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={filteredSupplyVsDemandData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="day" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="supply" fill="#10b981" name="Supply Available" />
+                <Line type="monotone" dataKey="demand" stroke="#dc2626" name="Demand" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      </div>
+
+      {/* Insights */}
+      <Card>
+        <h3 className="mb-4 text-lg font-bold text-gray-900">AI Insights</h3>
+        <div className="space-y-3">
+          <div className="rounded-lg bg-amber-50 p-3 border-l-4 border-amber-600">
+            <p className="font-semibold text-amber-900">⚠️ Supply Alert</p>
+            <p className="text-sm text-amber-800">O+ blood group shows {criticalShortages > 0 ? 'critical' : 'low'} supply in next {timeRange.toLowerCase()}</p>
+          </div>
+          <div className="rounded-lg bg-blue-50 p-3 border-l-4 border-blue-600">
+            <p className="font-semibold text-blue-900">📊 Trend Analysis</p>
+            <p className="text-sm text-blue-800">Demand is increasing by 5-8% every 3 days. Recommend increasing collections.</p>
+          </div>
+          <div className="rounded-lg bg-green-50 p-3 border-l-4 border-green-600">
+            <p className="font-semibold text-green-900">✓ Recommendation</p>
+            <p className="text-sm text-green-800">Schedule additional donation camps in high-demand areas this week.</p>
+          </div>
         </div>
       </Card>
     </DashboardLayout>
