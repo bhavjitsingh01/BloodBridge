@@ -1,13 +1,13 @@
 'use client'
 
-import { Users, Building2, AlertTriangle, Activity } from 'lucide-react'
+import { Users, Building2, AlertTriangle, Activity, Loader } from 'lucide-react'
 import DashboardLayout from '@/components/DashboardLayout'
 import StatCard from '@/components/StatCard'
 import Card from '@/components/Card'
 import Table from '@/components/Table'
 import Badge from '@/components/Badge'
 import Alert from '@/components/Alert'
-import { mockAdminData } from '@/lib/mockData'
+import { useAdminDashboardData } from '@/lib/useDashboardData'
 import { formatDateTime } from '@/lib/dateUtils'
 
 const navItems = [
@@ -19,9 +19,54 @@ const navItems = [
 ]
 
 export default function AdminDashboard() {
-  const { systemStats, cityBloodAvailability, hospitalsList, emergencyRequests, recentNotifications } = mockAdminData
+  const { data, loading, error } = useAdminDashboardData()
 
-  const criticalBloodGroups = cityBloodAvailability.filter((b) => b.status === 'Critical').length
+  if (loading) {
+    return (
+      <DashboardLayout
+        title="System Administration"
+        subtitle="Loading dashboard..."
+        userRole="System Administrator"
+        navItems={navItems}
+      >
+        <div className="flex justify-center items-center py-12">
+          <Loader className="h-8 w-8 animate-spin text-blood-600" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout
+        title="System Administration"
+        subtitle="Error loading dashboard"
+        userRole="System Administrator"
+        navItems={navItems}
+      >
+        <Alert
+          type="danger"
+          title="Failed to load dashboard"
+          message={error}
+          className="mb-6"
+        />
+      </DashboardLayout>
+    )
+  }
+
+  const hospitals = data?.nearbyHospitals || []
+  const bloodBanks = data?.nearbyBloodBanks || []
+  const inventory = data?.inventory || []
+  const emergencyRequests = data?.emergencyRequests || []
+
+  const systemStats = {
+    totalHospitals: hospitals.length,
+    totalBloodBanks: bloodBanks.length,
+    totalDonors: data?.nearbyDonors?.length || 0,
+    totalInventory: inventory.reduce((sum, inv: any) => sum + (inv.available || 0), 0)
+  }
+
+  const criticalBloodGroups = inventory.filter((inv: any) => (inv.available || 0) < 10).length
 
   const hospitalsColumns = [
     { key: 'name' as const, label: 'Hospital' },
@@ -103,25 +148,29 @@ export default function AdminDashboard() {
       <Card className="mb-8">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">City Blood Availability Status</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {cityBloodAvailability.map((blood) => (
-            <div key={blood.bloodGroup} className="rounded-lg border border-gray-200 p-4">
-              <p className="text-2xl font-bold text-blood-600">{blood.bloodGroup}</p>
-              <p className="mt-2 text-gray-600">{blood.units} units</p>
-              <div className="mt-3">
-                <Badge
-                  variant={
-                    blood.status === 'Critical'
-                      ? 'danger'
-                      : blood.status === 'Low'
-                        ? 'warning'
-                        : 'success'
-                  }
-                >
-                  {blood.status}
-                </Badge>
+          {inventory.map((blood: any) => {
+            const available = blood.available || 0
+            const status = available === 0 ? 'Critical' : available < 10 ? 'Low' : 'Stable'
+            return (
+              <div key={blood.bloodGroup} className="rounded-lg border border-gray-200 p-4">
+                <p className="text-2xl font-bold text-blood-600">{blood.bloodGroup}</p>
+                <p className="mt-2 text-gray-600">{available} units</p>
+                <div className="mt-3">
+                  <Badge
+                    variant={
+                      status === 'Critical'
+                        ? 'danger'
+                        : status === 'Low'
+                          ? 'warning'
+                          : 'success'
+                    }
+                  >
+                    {status}
+                  </Badge>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </Card>
 
@@ -139,36 +188,36 @@ export default function AdminDashboard() {
         <Card>
           <h2 className="mb-4 text-lg font-semibold text-gray-900">Connected Hospitals</h2>
           <div className="space-y-3">
-            {hospitalsList.map((hospital) => (
-              <div key={hospital.id} className="rounded-lg border border-gray-200 p-3">
+            {hospitals.slice(0, 5).map((hospital: any) => (
+              <div key={hospital._id || hospital.id} className="rounded-lg border border-gray-200 p-3">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="font-semibold text-gray-900">{hospital.name}</p>
-                    <p className="text-sm text-gray-600">{hospital.location}</p>
+                    <p className="text-sm text-gray-600">{hospital.address || hospital.location}</p>
                   </div>
-                  <Badge variant="success">{hospital.bloodRequests} requests</Badge>
+                  <Badge variant="success">Active</Badge>
                 </div>
               </div>
             ))}
           </div>
         </Card>
 
-        {/* Recent Notifications */}
+        {/* Recent Emergency Requests */}
         <Card>
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">System Notifications</h2>
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">Recent Emergency Requests</h2>
           <div className="space-y-3">
-            {recentNotifications.map((notif) => (
-              <div key={notif.id} className="rounded-lg border border-gray-200 p-3">
+            {emergencyRequests.slice(0, 5).map((req: any) => (
+              <div key={req._id || req.id} className="rounded-lg border border-gray-200 p-3">
                 <div className="flex items-start gap-3">
-                  {notif.type === 'alert' ? (
+                  {req.priority === 'Critical' ? (
                     <AlertTriangle className="h-5 w-5 flex-shrink-0 text-red-600" />
                   ) : (
                     <Activity className="h-5 w-5 flex-shrink-0 text-blue-600" />
                   )}
                   <div className="flex-1">
-                    <p className="text-sm text-gray-900">{notif.message}</p>
+                    <p className="text-sm text-gray-900">{req.bloodGroup} needed: {req.unitsNeeded} units</p>
                     <p className="mt-1 text-xs text-gray-500">
-                      {formatDateTime(notif.timestamp)}
+                      {req.hospital?.name} - {req.status}
                     </p>
                   </div>
                 </div>

@@ -1,69 +1,90 @@
 import { Schema, model, Document, Types } from 'mongoose';
-import { NOTIFICATION_TYPES, NotificationType, NOTIFICATION_PRIORITY, NotificationPriority } from '../config/constants';
 
 export interface INotification extends Document {
-  recipient: Types.ObjectId;
-  type: NotificationType;
+  userId: Types.ObjectId;
   title: string;
   message: string;
-  facility?: Types.ObjectId;
-  bloodGroup?: string;
-  priority: NotificationPriority;
-  read: boolean;
-  actionUrl?: string;
-  metadata?: Record<string, any>;
-  sentAt: Date;
-  readAt?: Date;
+  type: 'emergency_donor_request' | 'expiry_alert' | 'transfer_recommendation' | 'general';
+  priority: 'Low' | 'Medium' | 'High' | 'Critical';
+  isRead: boolean;
+  metadata?: {
+    emergencyRequestId?: Types.ObjectId;
+    bloodGroup?: string;
+    unitsNeeded?: number;
+    hospitalId?: Types.ObjectId;
+    donorId?: Types.ObjectId;
+    expiryDate?: Date;
+    transferDetails?: {
+      fromLocationId: Types.ObjectId;
+      toLocationId: Types.ObjectId;
+      bloodGroup: string;
+      units: number;
+    };
+  };
   createdAt: Date;
+  updatedAt: Date;
 }
 
 const notificationSchema = new Schema<INotification>(
   {
-    recipient: {
+    userId: {
       type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    type: {
-      type: String,
-      enum: NOTIFICATION_TYPES,
-      required: true,
+      required: [true, 'User ID is required'],
     },
     title: {
       type: String,
-      required: true,
+      required: [true, 'Title is required'],
+      trim: true,
     },
     message: {
       type: String,
-      required: true,
+      required: [true, 'Message is required'],
+      trim: true,
     },
-    facility: {
-      type: Schema.Types.ObjectId,
-      ref: 'Hospital',
+    type: {
+      type: String,
+      required: [true, 'Notification type is required'],
+      enum: {
+        values: ['emergency_donor_request', 'expiry_alert', 'transfer_recommendation', 'general'],
+        message: 'Invalid notification type',
+      },
+      default: 'general',
     },
-    bloodGroup: String,
     priority: {
       type: String,
-      enum: NOTIFICATION_PRIORITY,
-      default: 'normal',
+      required: [true, 'Priority is required'],
+      enum: {
+        values: ['Low', 'Medium', 'High', 'Critical'],
+        message: 'Invalid priority level',
+      },
+      default: 'Medium',
     },
-    read: {
+    isRead: {
       type: Boolean,
       default: false,
     },
-    actionUrl: String,
-    metadata: Schema.Types.Mixed,
-    sentAt: {
-      type: Date,
-      default: Date.now,
+    metadata: {
+      emergencyRequestId: Schema.Types.ObjectId,
+      bloodGroup: String,
+      unitsNeeded: Number,
+      hospitalId: Schema.Types.ObjectId,
+      donorId: Schema.Types.ObjectId,
+      expiryDate: Date,
+      transferDetails: {
+        fromLocationId: Schema.Types.ObjectId,
+        toLocationId: Schema.Types.ObjectId,
+        bloodGroup: String,
+        units: Number,
+      },
     },
-    readAt: Date,
   },
   { timestamps: true }
 );
 
 // Indexes
-notificationSchema.index({ recipient: 1, read: 1 });
+notificationSchema.index({ userId: 1, isRead: 1 });
+notificationSchema.index({ userId: 1, type: 1 });
+notificationSchema.index({ priority: 1 });
 notificationSchema.index({ createdAt: -1 });
 
 export default model<INotification>('Notification', notificationSchema);

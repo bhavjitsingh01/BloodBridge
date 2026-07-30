@@ -1,100 +1,81 @@
 import { Schema, model, Document, Types } from 'mongoose';
-import { BLOOD_GROUPS, BloodGroup, EMERGENCY_STATUSES, EmergencyStatus, EMERGENCY_PRIORITY, EmergencyPriority } from '../config/constants';
 
 export interface IEmergencyRequest extends Document {
-  hospital: Types.ObjectId;
-  bloodGroup: BloodGroup;
-  unitsNeeded: number;
-  priority: EmergencyPriority;
-  patientInfo: {
-    age: number;
-    bloodGroup: BloodGroup;
-    condition: string;
-    reason: string;
-  };
-  status: EmergencyStatus;
-  sources: {
-    hospitals: Types.ObjectId[];
-    bloodBanks: Types.ObjectId[];
-    eligibleDonors: Types.ObjectId[];
-  };
-  estimates: {
-    fastestSource: {
-      facility: Types.ObjectId;
-      eta: number;
-      distance: number;
-    };
-    recommendedRoute: {
-      from: Types.ObjectId;
-      to: Types.ObjectId;
-      distance: number;
-      eta: number;
-    };
-  };
+  requesterId: Types.ObjectId;
+  requesterType: 'Hospital' | 'BloodBank';
+  bloodGroup: string;
+  unitsRequired: number;
+  priority: 'Normal' | 'High' | 'Critical';
+  requiredBefore: Date;
+  status: 'Pending' | 'Accepted' | 'Completed' | 'Cancelled';
   createdAt: Date;
-  resolvedAt?: Date;
   updatedAt: Date;
 }
 
 const emergencyRequestSchema = new Schema<IEmergencyRequest>(
   {
-    hospital: {
+    requesterId: {
       type: Schema.Types.ObjectId,
-      ref: 'Hospital',
-      required: true,
+      required: [true, 'Requester ID is required'],
+      refPath: 'requesterType',
+    },
+    requesterType: {
+      type: String,
+      required: [true, 'Requester type is required'],
+      enum: {
+        values: ['Hospital', 'BloodBank'],
+        message: 'Requester type must be Hospital or BloodBank',
+      },
     },
     bloodGroup: {
       type: String,
-      enum: BLOOD_GROUPS,
-      required: true,
+      required: [true, 'Blood group is required'],
+      enum: {
+        values: ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'],
+        message: 'Invalid blood group',
+      },
     },
-    unitsNeeded: {
+    unitsRequired: {
       type: Number,
-      required: true,
-      min: 1,
+      required: [true, 'Units required is required'],
+      min: [1, 'At least 1 unit is required'],
     },
     priority: {
       type: String,
-      enum: EMERGENCY_PRIORITY,
-      default: 'high',
+      required: [true, 'Priority is required'],
+      enum: {
+        values: ['Normal', 'High', 'Critical'],
+        message: 'Priority must be Normal, High, or Critical',
+      },
+      default: 'Normal',
     },
-    patientInfo: {
-      age: { type: Number, required: true },
-      bloodGroup: { type: String, enum: BLOOD_GROUPS, required: true },
-      condition: { type: String, required: true },
-      reason: { type: String, required: true },
+    requiredBefore: {
+      type: Date,
+      required: [true, 'Required before date is required'],
+      validate: {
+        validator: (v: Date) => v > new Date(),
+        message: 'Required before date must be in the future',
+      },
     },
     status: {
       type: String,
-      enum: EMERGENCY_STATUSES,
-      default: 'active',
-    },
-    sources: {
-      hospitals: [{ type: Schema.Types.ObjectId, ref: 'Hospital' }],
-      bloodBanks: [{ type: Schema.Types.ObjectId, ref: 'BloodBank' }],
-      eligibleDonors: [{ type: Schema.Types.ObjectId, ref: 'Donor' }],
-    },
-    estimates: {
-      fastestSource: {
-        facility: { type: Schema.Types.ObjectId, ref: 'Hospital' },
-        eta: Number,
-        distance: Number,
+      required: [true, 'Status is required'],
+      enum: {
+        values: ['Pending', 'Accepted', 'Completed', 'Cancelled'],
+        message: 'Status must be Pending, Accepted, Completed, or Cancelled',
       },
-      recommendedRoute: {
-        from: { type: Schema.Types.ObjectId, ref: 'Hospital' },
-        to: { type: Schema.Types.ObjectId, ref: 'Hospital' },
-        distance: Number,
-        eta: Number,
-      },
+      default: 'Pending',
     },
-    resolvedAt: Date,
   },
   { timestamps: true }
 );
 
-// Indexes
+// Indexes for efficient queries
 emergencyRequestSchema.index({ status: 1 });
 emergencyRequestSchema.index({ priority: 1 });
+emergencyRequestSchema.index({ requesterId: 1 });
 emergencyRequestSchema.index({ createdAt: -1 });
+emergencyRequestSchema.index({ requiredBefore: 1 });
+emergencyRequestSchema.index({ bloodGroup: 1, status: 1 });
 
 export default model<IEmergencyRequest>('EmergencyRequest', emergencyRequestSchema);

@@ -1,198 +1,294 @@
-import Notification, { INotification } from '../models/Notification';
-import User from '../models/User';
+import Notification from '../models/Notification';
 import Donor from '../models/Donor';
 import Hospital from '../models/Hospital';
-import { NotFoundError } from '../utils/errors';
-import { NotificationType, NotificationPriority } from '../config/constants';
+import BloodBank from '../models/BloodBank';
+import User from '../models/User';
+import logger from '../utils/logger';
+import { Types } from 'mongoose';
 
-interface CreateNotificationInput {
-  recipientId: string;
-  type: NotificationType;
+interface NotificationPayload {
+  userId: string;
   title: string;
   message: string;
-  facilityId?: string;
-  bloodGroup?: string;
-  priority: NotificationPriority;
-  actionUrl?: string;
-  metadata?: Record<string, any>;
+  type: 'emergency_donor_request' | 'expiry_alert' | 'transfer_recommendation' | 'general';
+  priority: 'Low' | 'Medium' | 'High' | 'Critical';
+  metadata?: any;
+}
+
+interface NotificationResponse {
+  _id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: string;
+  priority: string;
+  isRead: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  metadata?: any;
 }
 
 export class NotificationService {
-  /**
-   * Create a notification
-   */
-  static async createNotification(input: CreateNotificationInput): Promise<INotification> {
-    const user = await User.findById(input.recipientId);
-    if (!user) {
-      throw new NotFoundError('User');
-    }
+  async createNotification(payload: NotificationPayload): Promise<NotificationResponse> {
+    try {
+      const notification = new Notification({
+        userId: new Types.ObjectId(payload.userId),
+        title: payload.title,
+        message: payload.message,
+        type: payload.type,
+        priority: payload.priority,
+        metadata: payload.metadata || {},
+      });
 
-    const notification = await Notification.create({
-      recipient: input.recipientId,
-      type: input.type,
-      title: input.title,
-      message: input.message,
-      facility: input.facilityId,
-      bloodGroup: input.bloodGroup,
-      priority: input.priority,
-      actionUrl: input.actionUrl,
-      metadata: input.metadata,
-      sentAt: new Date(),
-    });
+      await notification.save();
+      logger.info(`Notification created for user ${payload.userId}: ${payload.type}`);
 
-    return notification;
-  }
-
-  /**
-   * Get user notifications
-   */
-  static async getUserNotifications(
-    userId: string,
-    skip: number = 0,
-    limit: number = 20
-  ): Promise<{
-    notifications: INotification[];
-    total: number;
-    unreadCount: number;
-  }> {
-    const [notifications, total, unreadCount] = await Promise.all([
-      Notification.find({ recipient: userId })
-        .sort({ sentAt: -1 })
-        .skip(skip)
-        .limit(limit),
-      Notification.countDocuments({ recipient: userId }),
-      Notification.countDocuments({ recipient: userId, read: false }),
-    ]);
-
-    return { notifications, total, unreadCount };
-  }
-
-  /**
-   * Mark notification as read
-   */
-  static async markAsRead(notificationId: string): Promise<INotification> {
-    const notification = await Notification.findByIdAndUpdate(
-      notificationId,
-      { read: true, readAt: new Date() },
-      { new: true }
-    );
-
-    if (!notification) {
-      throw new NotFoundError('Notification');
-    }
-
-    return notification;
-  }
-
-  /**
-   * Mark all notifications as read
-   */
-  static async markAllAsRead(userId: string): Promise<void> {
-    await Notification.updateMany(
-      { recipient: userId, read: false },
-      { read: true, readAt: new Date() }
-    );
-  }
-
-  /**
-   * Delete notification
-   */
-  static async deleteNotification(notificationId: string): Promise<void> {
-    const notification = await Notification.findByIdAndDelete(notificationId);
-    if (!notification) {
-      throw new NotFoundError('Notification');
+      return this.formatNotification(notification);
+    } catch (error) {
+      logger.error('Create notification error:', error);
+      throw error;
     }
   }
 
-  /**
-   * Send blood needed notification
-   */
-  static async notifyBloodNeeded(
-    facilityId: string,
+  async notifyDonorsForEmergency(
+    emergencyRequestId: string,
     bloodGroup: string,
-    units: number
+    unitsRequired: number,
+    requesterLocation: [number, number],
+    priority: string
   ): Promise<void> {
-    // Find all donors with matching blood group
-    const donors = await Donor.find({ bloodGroup }).populate('user', '_id');
+    try {
+      logger.info(`Notifying donors for emergency request: ${bloodGroup}, ${unitsRequired} units`);
 
-    for (const donor of donors) {
-      await this.createNotification({
-        recipientId: (donor.user as any)._id.toString(),
-        type: 'blood-needed',
-        title: 'Blood Donation Needed',
-        message: `${units} units of ${bloodGroup} blood are urgently needed`,
-        facilityId,
+      const now = new Date();
+
+      // Find eligible donors
+      const donors = await Donor.find({
         bloodGroup,
-        priority: 'high',
+        availabilityStatus: 'Available',
+        nextEligibleDate: { $lte: now },
+        location: {
+          $near: {
+            $geometry: {
+              type: 'Point',
+              coordinates: requesterLocation,
+            },
+            $maxDistance: 50000, // 50km
+          },
+        },
       });
-    }
-  }
 
-  /**
-   * Send emergency notification
-   */
-  static async notifyEmergency(facilityId: string, bloodGroup: string): Promise<void> {
-    const hospital = await Hospital.findById(facilityId);
+      logger.info(`Found ${donors.length} eligible donors`);
 
-    if (hospital) {
-      const adminUser = await User.findById(hospital.adminUser);
-      if (adminUser) {
-        await this.createNotification({
-          recipientId: adminUser._id.toString(),
-          type: 'emergency',
-          title: 'Emergency Blood Request',
-          message: `Emergency request for ${bloodGroup} blood at ${hospital.name}`,
-          facilityId,
-          bloodGroup,
-          priority: 'critical',
-        });
+      // Create notifications for each donor
+      for (const donor of donors) {
+        const donorUser = await User.findOne({ email: donor.email });
+
+        if (donorUser) {
+          await this.createNotification({
+            userId: donorUser._id.toString(),
+            title: `Emergency Blood Donation Request - ${bloodGroup}`,
+            message: `An emergency blood request for ${bloodGroup} blood type has been issued. ${unitsRequired} units are urgently needed. Your donation could save lives.`,
+            type: 'emergency_donor_request',
+            priority: priority as any,
+            metadata: {
+              emergencyRequestId: new Types.ObjectId(emergencyRequestId),
+              bloodGroup,
+              unitsNeeded: unitsRequired,
+              donorId: donor._id,
+            },
+          });
+        }
       }
+
+      logger.info(`Notifications sent to ${donors.length} donors`);
+    } catch (error) {
+      logger.error('Notify donors for emergency error:', error);
+      throw error;
     }
   }
 
-  /**
-   * Send low stock notification
-   */
-  static async notifyLowStock(facilityId: string, bloodGroup: string): Promise<void> {
-    const hospital = await Hospital.findById(facilityId);
+  async notifyHospitalExpiryAlert(
+    hospitalId: string,
+    bloodGroup: string,
+    units: number,
+    expiryDate: Date,
+    daysUntilExpiry: number
+  ): Promise<void> {
+    try {
+      const hospital = await Hospital.findById(hospitalId);
+      if (!hospital) return;
 
-    if (hospital) {
-      const adminUser = await User.findById(hospital.adminUser);
-      if (adminUser) {
+      // Find hospital admin/manager
+      const hospitalUser = await User.findOne({ email: hospital.email });
+
+      if (hospitalUser) {
+        const priority = daysUntilExpiry <= 3 ? 'Critical' : 'High';
+
         await this.createNotification({
-          recipientId: adminUser._id.toString(),
-          type: 'low-stock',
-          title: 'Low Blood Stock Alert',
-          message: `${bloodGroup} blood stock is running low at ${hospital.name}`,
-          facilityId,
-          bloodGroup,
-          priority: 'high',
+          userId: hospitalUser._id.toString(),
+          title: `Blood Expiry Alert - ${bloodGroup}`,
+          message: `${units} units of ${bloodGroup} blood will expire in ${daysUntilExpiry} days (${expiryDate.toLocaleDateString()}). Please prioritize usage or arrange transfer.`,
+          type: 'expiry_alert',
+          priority,
+          metadata: {
+            hospitalId: new Types.ObjectId(hospitalId),
+            bloodGroup,
+            units,
+            expiryDate,
+            daysUntilExpiry,
+          },
         });
+
+        logger.info(`Expiry alert sent to hospital ${hospital.name}`);
       }
+    } catch (error) {
+      logger.error('Notify hospital expiry alert error:', error);
+      throw error;
     }
   }
 
-  /**
-   * Send appointment reminder
-   */
-  static async notifyAppointmentReminder(donorId: string, facilityName: string): Promise<void> {
-    const donor = await Donor.findById(donorId);
+  async notifyTransferRecommendation(
+    toLocationId: string,
+    fromLocationId: string,
+    fromLocationType: 'Hospital' | 'BloodBank',
+    bloodGroup: string,
+    units: number,
+    reason: string
+  ): Promise<void> {
+    try {
+      let toLocation = await Hospital.findById(toLocationId);
+      if (!toLocation) {
+        toLocation = await BloodBank.findById(toLocationId);
+      }
 
-    if (donor) {
-      await this.createNotification({
-        recipientId: (donor.user as any).toString(),
-        type: 'appointment-reminder',
-        title: 'Upcoming Donation Appointment',
-        message: `You have a donation appointment scheduled at ${facilityName}. Please arrive 15 minutes early.`,
-        priority: 'normal',
+      if (!toLocation) return;
+
+      const toUser = await User.findOne({ email: toLocation.email });
+
+      if (toUser) {
+        await this.createNotification({
+          userId: toUser._id.toString(),
+          title: `Blood Transfer Recommendation - ${bloodGroup}`,
+          message: `We recommend receiving ${units} units of ${bloodGroup} blood from nearby facility. ${reason}`,
+          type: 'transfer_recommendation',
+          priority: 'High',
+          metadata: {
+            transferDetails: {
+              fromLocationId: new Types.ObjectId(fromLocationId),
+              toLocationId: new Types.ObjectId(toLocationId),
+              bloodGroup,
+              units,
+            },
+          },
+        });
+
+        logger.info(`Transfer recommendation sent to location ${toLocation.name}`);
+      }
+    } catch (error) {
+      logger.error('Notify transfer recommendation error:', error);
+      throw error;
+    }
+  }
+
+  async getUserNotifications(
+    userId: string,
+    limit: number = 20,
+    page: number = 1
+  ): Promise<{ notifications: NotificationResponse[]; total: number; pages: number }> {
+    try {
+      const skip = (page - 1) * limit;
+
+      const [notifications, total] = await Promise.all([
+        Notification.find({ userId: new Types.ObjectId(userId) })
+          .sort({ createdAt: -1 })
+          .limit(limit)
+          .skip(skip)
+          .lean(),
+        Notification.countDocuments({ userId: new Types.ObjectId(userId) }),
+      ]);
+
+      return {
+        notifications: notifications.map((n: any) => this.formatNotification(n)),
+        total,
+        pages: Math.ceil(total / limit),
+      };
+    } catch (error) {
+      logger.error('Get user notifications error:', error);
+      throw error;
+    }
+  }
+
+  async markAsRead(notificationId: string): Promise<NotificationResponse> {
+    try {
+      const notification = await Notification.findByIdAndUpdate(
+        notificationId,
+        { isRead: true },
+        { new: true }
+      );
+
+      if (!notification) {
+        throw new Error('Notification not found');
+      }
+
+      logger.info(`Notification marked as read: ${notificationId}`);
+      return this.formatNotification(notification);
+    } catch (error) {
+      logger.error('Mark as read error:', error);
+      throw error;
+    }
+  }
+
+  async deleteNotification(notificationId: string): Promise<void> {
+    try {
+      await Notification.findByIdAndDelete(notificationId);
+      logger.info(`Notification deleted: ${notificationId}`);
+    } catch (error) {
+      logger.error('Delete notification error:', error);
+      throw error;
+    }
+  }
+
+  async getUnreadCount(userId: string): Promise<number> {
+    try {
+      return await Notification.countDocuments({
+        userId: new Types.ObjectId(userId),
+        isRead: false,
       });
+    } catch (error) {
+      logger.error('Get unread count error:', error);
+      throw error;
     }
   }
 
-  /**
-   * Get unread notifications count
-   */
-  static async getUnreadCount(userId: string): Promise<number> {
-    return Notification.countDocuments({ recipient: userId, read: false });
+  async markAllAsRead(userId: string): Promise<void> {
+    try {
+      await Notification.updateMany(
+        { userId: new Types.ObjectId(userId), isRead: false },
+        { isRead: true }
+      );
+
+      logger.info(`All notifications marked as read for user ${userId}`);
+    } catch (error) {
+      logger.error('Mark all as read error:', error);
+      throw error;
+    }
+  }
+
+  private formatNotification(notification: any): NotificationResponse {
+    return {
+      _id: notification._id.toString(),
+      userId: notification.userId.toString(),
+      title: notification.title,
+      message: notification.message,
+      type: notification.type,
+      priority: notification.priority,
+      isRead: notification.isRead,
+      createdAt: notification.createdAt,
+      updatedAt: notification.updatedAt,
+      metadata: notification.metadata,
+    };
   }
 }
+
+export default new NotificationService();

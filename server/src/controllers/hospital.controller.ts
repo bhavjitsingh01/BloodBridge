@@ -1,130 +1,271 @@
 import { Request, Response } from 'express';
-import { z } from 'zod';
-import { HospitalService } from '../services/hospital.service';
-import { sendSuccess, sendCreated, sendPaginated } from '../utils/responses';
-import { asyncHandler } from '../middleware/errorHandler';
-import { DEFAULT_PAGE, DEFAULT_LIMIT, MAX_LIMIT } from '../config/constants';
+import Hospital, { IHospital } from '../models/Hospital';
+import logger from '../utils/logger';
 
-const createHospitalSchema = z.object({
-  name: z.string().min(2),
-  licenseNumber: z.string(),
-  email: z.string().email(),
-  phone: z.string(),
-  address: z.object({
-    street: z.string(),
-    city: z.string(),
-    state: z.string(),
-    pincode: z.string(),
-    coordinates: z.object({
-      latitude: z.number(),
-      longitude: z.number(),
-    }),
-  }),
-  registrationNumber: z.string(),
-  operatingHours: z
-    .object({
-      open: z.string(),
-      close: z.string(),
-      daysOpen: z.array(z.number()),
-    })
-    .optional(),
-});
+interface AuthRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+  };
+}
 
-const updateHospitalSchema = z.object({
-  name: z.string().min(2).optional(),
-  email: z.string().email().optional(),
-  phone: z.string().optional(),
-  address: createHospitalSchema.shape.address.optional(),
-  operatingHours: createHospitalSchema.shape.operatingHours.optional(),
-});
+// Create hospital
+export const createHospital = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    // Only Admin and Hospital roles can create
+    if (!['Admin', 'Hospital'].includes(req.user?.role || '')) {
+      res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions',
+      });
+      return;
+    }
 
-const paginationSchema = z.object({
-  page: z.string().optional().transform((val) => Math.max(parseInt(val || DEFAULT_PAGE.toString()), 1)),
-  limit: z.string().optional().transform((val) => Math.min(parseInt(val || DEFAULT_LIMIT.toString()), MAX_LIMIT)),
-});
+    const { name, email, phone, address, city, state, location } = req.body;
 
-export const hospitalController = {
-  /**
-   * Create hospital
-   */
-  createHospital: asyncHandler(async (req: Request, res: Response) => {
-    const validated = await createHospitalSchema.parseAsync(req.body);
-    const hospital = await HospitalService.createHospital({
-      ...validated,
-      adminUserId: req.user!.id,
+    // Validate required fields
+    if (!name || !email || !phone || !address || !city || !state || !location) {
+      res.status(400).json({
+        success: false,
+        message: 'All fields are required',
+      });
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid email format',
+      });
+      return;
+    }
+
+    // Check if hospital already exists
+    const existingHospital = await Hospital.findOne({ email: email.toLowerCase() });
+    if (existingHospital) {
+      res.status(409).json({
+        success: false,
+        message: 'Hospital with this email already exists',
+      });
+      return;
+    }
+
+    // Validate GeoJSON location
+    if (!location.coordinates || location.coordinates.length !== 2) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid location format. Must be [longitude, latitude]',
+      });
+      return;
+    }
+
+    const hospital = new Hospital({
+      name,
+      email: email.toLowerCase(),
+      phone,
+      address,
+      city,
+      state,
+      location: {
+        type: 'Point',
+        coordinates: location.coordinates,
+      },
+      role: 'hospital',
     });
-    sendCreated(res, hospital, 'Hospital created successfully');
-  }),
 
-  /**
-   * Get all hospitals
-   */
-  getAllHospitals: asyncHandler(async (req: Request, res: Response) => {
-    const { page, limit } = await paginationSchema.parseAsync(req.query);
-    const skip = (page - 1) * limit;
+    await hospital.save();
+    logger.info(`Hospital created: ${email}`);
 
-    const { hospitals, total } = await HospitalService.getAllHospitals(skip, limit);
-    sendPaginated(res, hospitals, total, page, limit, 'Hospitals retrieved successfully');
-  }),
+    res.status(201).json({
+      success: true,
+      message: 'Hospital created successfully',
+      data: hospital,
+    });
+  } catch (error) {
+    logger.error('Create hospital error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create hospital',
+    });
+  }
+};
 
-  /**
-   * Get hospital by ID
-   */
-  getHospitalById: asyncHandler(async (req: Request, res: Response) => {
+// Get all hospitals with pagination and search
+export const getHospitals = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { page = 1, limit = 10, search, city, state, name } = req.query;
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 10;
+
+    // Build filter
+    const filter: any = {};
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+      ];
+    }
+    if (city) filter.city = { $regex: city as string, $options: 'i' };
+    if (state) filter.state = { $regex: state as string, $options: 'i' };
+    if (name) filter.name = { $regex: name as string, $options: 'i' };
+
+    const total = await Hospital.countDocuments(filter);
+    const hospitals = await Hospital.find(filter)
+      .limit(limitNum)
+      .skip((pageNum - 1) * limitNum)
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      message: 'Hospitals retrieved successfully',
+      data: hospitals,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    logger.error('Get hospitals error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve hospitals',
+    });
+  }
+};
+
+// Get hospital by ID
+export const getHospitalById = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
     const { id } = req.params;
-    const hospital = await HospitalService.getHospitalById(id);
-    sendSuccess(res, hospital, 'Hospital retrieved successfully');
-  }),
 
-  /**
-   * Update hospital
-   */
-  updateHospital: asyncHandler(async (req: Request, res: Response) => {
+    const hospital = await Hospital.findById(id);
+    if (!hospital) {
+      res.status(404).json({
+        success: false,
+        message: 'Hospital not found',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Hospital retrieved successfully',
+      data: hospital,
+    });
+  } catch (error) {
+    logger.error('Get hospital by ID error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve hospital',
+    });
+  }
+};
+
+// Update hospital
+export const updateHospital = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
     const { id } = req.params;
-    const validated = await updateHospitalSchema.parseAsync(req.body);
-    const hospital = await HospitalService.updateHospital(id, validated);
-    sendSuccess(res, hospital, 'Hospital updated successfully');
-  }),
+    const { name, email, phone, address, city, state, location } = req.body;
 
-  /**
-   * Verify hospital (Admin only)
-   */
-  verifyHospital: asyncHandler(async (req: Request, res: Response) => {
+    // Check authorization
+    if (req.user?.role !== 'Admin' && req.user?.role !== 'Hospital') {
+      res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions',
+      });
+      return;
+    }
+
+    const hospital = await Hospital.findById(id);
+    if (!hospital) {
+      res.status(404).json({
+        success: false,
+        message: 'Hospital not found',
+      });
+      return;
+    }
+
+    // Update fields
+    if (name) hospital.name = name;
+    if (email) {
+      const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+      if (!emailRegex.test(email)) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid email format',
+        });
+        return;
+      }
+      hospital.email = email.toLowerCase();
+    }
+    if (phone) hospital.phone = phone;
+    if (address) hospital.address = address;
+    if (city) hospital.city = city;
+    if (state) hospital.state = state;
+    if (location && location.coordinates) {
+      hospital.location = {
+        type: 'Point',
+        coordinates: location.coordinates,
+      };
+    }
+
+    await hospital.save();
+    logger.info(`Hospital updated: ${id}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Hospital updated successfully',
+      data: hospital,
+    });
+  } catch (error) {
+    logger.error('Update hospital error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update hospital',
+    });
+  }
+};
+
+// Delete hospital
+export const deleteHospital = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
     const { id } = req.params;
-    const hospital = await HospitalService.verifyHospital(id);
-    sendSuccess(res, hospital, 'Hospital verified successfully');
-  }),
 
-  /**
-   * Find nearby hospitals
-   */
-  findNearbyHospitals: asyncHandler(async (req: Request, res: Response) => {
-    const { latitude, longitude, maxDistance } = req.query;
+    // Check authorization
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({
+        success: false,
+        message: 'Only admins can delete hospitals',
+      });
+      return;
+    }
 
-    const facilities = await HospitalService.findNearbyFacilities(
-      parseFloat(latitude as string),
-      parseFloat(longitude as string),
-      maxDistance ? parseInt(maxDistance as string) : undefined
-    );
+    const hospital = await Hospital.findByIdAndDelete(id);
+    if (!hospital) {
+      res.status(404).json({
+        success: false,
+        message: 'Hospital not found',
+      });
+      return;
+    }
 
-    sendSuccess(res, facilities, 'Nearby hospitals retrieved successfully');
-  }),
+    logger.info(`Hospital deleted: ${id}`);
 
-  /**
-   * Get hospital inventory
-   */
-  getHospitalInventory: asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const inventory = await HospitalService.getHospitalInventory(id);
-    sendSuccess(res, inventory, 'Hospital inventory retrieved successfully');
-  }),
-
-  /**
-   * Delete hospital
-   */
-  deleteHospital: asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-    await HospitalService.deleteHospital(id);
-    sendSuccess(res, null, 'Hospital deleted successfully');
-  }),
+    res.status(200).json({
+      success: true,
+      message: 'Hospital deleted successfully',
+      data: hospital,
+    });
+  } catch (error) {
+    logger.error('Delete hospital error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete hospital',
+    });
+  }
 };

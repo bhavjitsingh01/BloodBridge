@@ -1,9 +1,11 @@
+import http from 'http';
 import app from './app';
 import { connectDatabase } from './config/database';
 import logger from './utils/logger';
 import { validateEnvironment } from './config/environment';
+import { initializeSocketService } from './services/socket.service';
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 /**
@@ -18,17 +20,25 @@ const startServer = async (): Promise<void> => {
     await connectDatabase();
     logger.info('MongoDB connection established');
 
-    // Start Express server
-    const server = app.listen(PORT, () => {
+    // Create HTTP server
+    const httpServer = http.createServer(app);
+
+    // Initialize Socket.IO service
+    initializeSocketService(httpServer);
+    logger.info('Socket.IO service initialized');
+
+    // Start HTTP server with Socket.IO
+    httpServer.listen(PORT, () => {
       logger.info(`BloodBridge Server running on port ${PORT} in ${NODE_ENV} mode`);
       logger.info(`Server URL: http://localhost:${PORT}`);
       logger.info(`API Base URL: http://localhost:${PORT}/api/v1`);
+      logger.info(`Socket.IO URL: ws://localhost:${PORT}`);
     });
 
     // Graceful shutdown handlers
     process.on('SIGTERM', () => {
       logger.info('SIGTERM received. Starting graceful shutdown...');
-      server.close(() => {
+      httpServer.close(() => {
         logger.info('Server closed');
         process.exit(0);
       });
@@ -36,7 +46,7 @@ const startServer = async (): Promise<void> => {
 
     process.on('SIGINT', () => {
       logger.info('SIGINT received. Starting graceful shutdown...');
-      server.close(() => {
+      httpServer.close(() => {
         logger.info('Server closed');
         process.exit(0);
       });

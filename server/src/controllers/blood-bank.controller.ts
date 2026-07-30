@@ -1,122 +1,270 @@
 import { Request, Response } from 'express';
-import { z } from 'zod';
-import { BloodBankService } from '../services/blood-bank.service';
-import { sendSuccess, sendCreated, sendPaginated } from '../utils/responses';
-import { asyncHandler } from '../middleware/errorHandler';
-import { DEFAULT_PAGE, DEFAULT_LIMIT, MAX_LIMIT } from '../config/constants';
+import BloodBank, { IBloodBank } from '../models/BloodBank';
+import logger from '../utils/logger';
 
-const createBloodBankSchema = z.object({
-  name: z.string().min(2),
-  licenseNumber: z.string(),
-  email: z.string().email(),
-  phone: z.string(),
-  address: z.object({
-    street: z.string(),
-    city: z.string(),
-    state: z.string(),
-    pincode: z.string(),
-    coordinates: z.object({
-      latitude: z.number(),
-      longitude: z.number(),
-    }),
-  }),
-  registrationNumber: z.string(),
-});
+interface AuthRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+  };
+}
 
-const updateBloodBankSchema = z.object({
-  name: z.string().min(2).optional(),
-  email: z.string().email().optional(),
-  phone: z.string().optional(),
-  address: createBloodBankSchema.shape.address.optional(),
-});
+// Create blood bank
+export const createBloodBank = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    // Only Admin and BloodBank roles can create
+    if (!['Admin', 'BloodBank'].includes(req.user?.role || '')) {
+      res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions',
+      });
+      return;
+    }
 
-const paginationSchema = z.object({
-  page: z.string().optional().transform((val) => Math.max(parseInt(val || DEFAULT_PAGE.toString()), 1)),
-  limit: z.string().optional().transform((val) => Math.min(parseInt(val || DEFAULT_LIMIT.toString()), MAX_LIMIT)),
-});
+    const { name, email, phone, address, city, state, location } = req.body;
 
-export const bloodBankController = {
-  /**
-   * Create blood bank
-   */
-  createBloodBank: asyncHandler(async (req: Request, res: Response) => {
-    const validated = await createBloodBankSchema.parseAsync(req.body);
-    const bank = await BloodBankService.createBloodBank({
-      ...validated,
-      adminUserId: req.user!.id,
+    // Validate required fields
+    if (!name || !email || !phone || !address || !city || !state || !location) {
+      res.status(400).json({
+        success: false,
+        message: 'All fields are required',
+      });
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid email format',
+      });
+      return;
+    }
+
+    // Check if blood bank already exists
+    const existingBloodBank = await BloodBank.findOne({ email: email.toLowerCase() });
+    if (existingBloodBank) {
+      res.status(409).json({
+        success: false,
+        message: 'Blood bank with this email already exists',
+      });
+      return;
+    }
+
+    // Validate GeoJSON location
+    if (!location.coordinates || location.coordinates.length !== 2) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid location format. Must be [longitude, latitude]',
+      });
+      return;
+    }
+
+    const bloodBank = new BloodBank({
+      name,
+      email: email.toLowerCase(),
+      phone,
+      address,
+      city,
+      state,
+      location: {
+        type: 'Point',
+        coordinates: location.coordinates,
+      },
     });
-    sendCreated(res, bank, 'Blood bank created successfully');
-  }),
 
-  /**
-   * Get all blood banks
-   */
-  getAllBloodBanks: asyncHandler(async (req: Request, res: Response) => {
-    const { page, limit } = await paginationSchema.parseAsync(req.query);
-    const skip = (page - 1) * limit;
+    await bloodBank.save();
+    logger.info(`Blood bank created: ${email}`);
 
-    const { banks, total } = await BloodBankService.getAllBloodBanks(skip, limit);
-    sendPaginated(res, banks, total, page, limit, 'Blood banks retrieved successfully');
-  }),
+    res.status(201).json({
+      success: true,
+      message: 'Blood bank created successfully',
+      data: bloodBank,
+    });
+  } catch (error) {
+    logger.error('Create blood bank error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create blood bank',
+    });
+  }
+};
 
-  /**
-   * Get blood bank by ID
-   */
-  getBloodBankById: asyncHandler(async (req: Request, res: Response) => {
+// Get all blood banks with pagination and search
+export const getBloodBanks = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { page = 1, limit = 10, search, city, state, name } = req.query;
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 10;
+
+    // Build filter
+    const filter: any = {};
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+      ];
+    }
+    if (city) filter.city = { $regex: city as string, $options: 'i' };
+    if (state) filter.state = { $regex: state as string, $options: 'i' };
+    if (name) filter.name = { $regex: name as string, $options: 'i' };
+
+    const total = await BloodBank.countDocuments(filter);
+    const bloodBanks = await BloodBank.find(filter)
+      .limit(limitNum)
+      .skip((pageNum - 1) * limitNum)
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      message: 'Blood banks retrieved successfully',
+      data: bloodBanks,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    logger.error('Get blood banks error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve blood banks',
+    });
+  }
+};
+
+// Get blood bank by ID
+export const getBloodBankById = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
     const { id } = req.params;
-    const bank = await BloodBankService.getBloodBankById(id);
-    sendSuccess(res, bank, 'Blood bank retrieved successfully');
-  }),
 
-  /**
-   * Update blood bank
-   */
-  updateBloodBank: asyncHandler(async (req: Request, res: Response) => {
+    const bloodBank = await BloodBank.findById(id);
+    if (!bloodBank) {
+      res.status(404).json({
+        success: false,
+        message: 'Blood bank not found',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Blood bank retrieved successfully',
+      data: bloodBank,
+    });
+  } catch (error) {
+    logger.error('Get blood bank by ID error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve blood bank',
+    });
+  }
+};
+
+// Update blood bank
+export const updateBloodBank = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
     const { id } = req.params;
-    const validated = await updateBloodBankSchema.parseAsync(req.body);
-    const bank = await BloodBankService.updateBloodBank(id, validated);
-    sendSuccess(res, bank, 'Blood bank updated successfully');
-  }),
+    const { name, email, phone, address, city, state, location } = req.body;
 
-  /**
-   * Verify blood bank
-   */
-  verifyBloodBank: asyncHandler(async (req: Request, res: Response) => {
+    // Check authorization
+    if (req.user?.role !== 'Admin' && req.user?.role !== 'BloodBank') {
+      res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions',
+      });
+      return;
+    }
+
+    const bloodBank = await BloodBank.findById(id);
+    if (!bloodBank) {
+      res.status(404).json({
+        success: false,
+        message: 'Blood bank not found',
+      });
+      return;
+    }
+
+    // Update fields
+    if (name) bloodBank.name = name;
+    if (email) {
+      const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+      if (!emailRegex.test(email)) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid email format',
+        });
+        return;
+      }
+      bloodBank.email = email.toLowerCase();
+    }
+    if (phone) bloodBank.phone = phone;
+    if (address) bloodBank.address = address;
+    if (city) bloodBank.city = city;
+    if (state) bloodBank.state = state;
+    if (location && location.coordinates) {
+      bloodBank.location = {
+        type: 'Point',
+        coordinates: location.coordinates,
+      };
+    }
+
+    await bloodBank.save();
+    logger.info(`Blood bank updated: ${id}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Blood bank updated successfully',
+      data: bloodBank,
+    });
+  } catch (error) {
+    logger.error('Update blood bank error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update blood bank',
+    });
+  }
+};
+
+// Delete blood bank
+export const deleteBloodBank = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
     const { id } = req.params;
-    const bank = await BloodBankService.verifyBloodBank(id);
-    sendSuccess(res, bank, 'Blood bank verified successfully');
-  }),
 
-  /**
-   * Find nearby blood banks
-   */
-  findNearbyBloodBanks: asyncHandler(async (req: Request, res: Response) => {
-    const { latitude, longitude, maxDistance } = req.query;
+    // Check authorization
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({
+        success: false,
+        message: 'Only admins can delete blood banks',
+      });
+      return;
+    }
 
-    const banks = await BloodBankService.findNearbyBloodBanks(
-      parseFloat(latitude as string),
-      parseFloat(longitude as string),
-      maxDistance ? parseInt(maxDistance as string) : undefined
-    );
+    const bloodBank = await BloodBank.findByIdAndDelete(id);
+    if (!bloodBank) {
+      res.status(404).json({
+        success: false,
+        message: 'Blood bank not found',
+      });
+      return;
+    }
 
-    sendSuccess(res, banks, 'Nearby blood banks retrieved successfully');
-  }),
+    logger.info(`Blood bank deleted: ${id}`);
 
-  /**
-   * Get expiring blood
-   */
-  getExpiringBlood: asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const expiring = await BloodBankService.getExpiringBlood(id);
-    sendSuccess(res, expiring, 'Expiring blood retrieved successfully');
-  }),
-
-  /**
-   * Delete blood bank
-   */
-  deleteBloodBank: asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-    await BloodBankService.deleteBloodBank(id);
-    sendSuccess(res, null, 'Blood bank deleted successfully');
-  }),
+    res.status(200).json({
+      success: true,
+      message: 'Blood bank deleted successfully',
+      data: bloodBank,
+    });
+  } catch (error) {
+    logger.error('Delete blood bank error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete blood bank',
+    });
+  }
 };

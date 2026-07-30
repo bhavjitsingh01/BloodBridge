@@ -1,18 +1,14 @@
 import { Router } from 'express';
 import { API_PREFIX } from '../config/constants';
-
 import authRoutes from './auth.routes';
 import hospitalRoutes from './hospital.routes';
 import bloodBankRoutes from './blood-bank.routes';
 import donorRoutes from './donor.routes';
 import bloodInventoryRoutes from './blood-inventory.routes';
-import bloodRequestRoutes from './blood-request.routes';
 import emergencyRoutes from './emergency.routes';
-import appointmentRoutes from './appointment.routes';
-import predictionRoutes from './prediction.routes';
-import notificationRoutes from './notification.routes';
-import analyticsRoutes from './analytics.routes';
-import adminRoutes from './admin.routes';
+import aiRoutes from './ai.routes';
+import notificationsRoutes from './notifications.routes';
+import recommendationsRoutes from './recommendations.routes';
 
 const router = Router();
 
@@ -22,41 +18,32 @@ router.use(`${API_PREFIX}/auth`, authRoutes);
 // Hospital routes
 router.use(`${API_PREFIX}/hospitals`, hospitalRoutes);
 
-// Blood bank routes
+// Blood Bank routes
 router.use(`${API_PREFIX}/blood-banks`, bloodBankRoutes);
 
 // Donor routes
 router.use(`${API_PREFIX}/donors`, donorRoutes);
 
-// Blood inventory routes
-router.use(`${API_PREFIX}/blood-inventory`, bloodInventoryRoutes);
-
-// Blood request routes
-router.use(`${API_PREFIX}/blood-requests`, bloodRequestRoutes);
+// Blood Inventory routes
+router.use(`${API_PREFIX}/inventory`, bloodInventoryRoutes);
 
 // Emergency routes
-router.use(`${API_PREFIX}/emergency-requests`, emergencyRoutes);
+router.use(`${API_PREFIX}/emergency`, emergencyRoutes);
 
-// Appointment routes
-router.use(`${API_PREFIX}/appointments`, appointmentRoutes);
-
-// Prediction routes
-router.use(`${API_PREFIX}/predictions`, predictionRoutes);
+// AI routes
+router.use(`${API_PREFIX}/ai`, aiRoutes);
 
 // Notification routes
-router.use(`${API_PREFIX}/notifications`, notificationRoutes);
+router.use(`${API_PREFIX}/notifications`, notificationsRoutes);
 
-// Analytics routes
-router.use(`${API_PREFIX}/analytics`, analyticsRoutes);
-
-// Admin routes
-router.use(`${API_PREFIX}/admin`, adminRoutes);
+// Recommendation routes
+router.use(`${API_PREFIX}/recommendations`, recommendationsRoutes);
 
 // Health check endpoint
 router.get(`${API_PREFIX}/health`, (req, res) => {
   res.json({
     success: true,
-    message: 'Server is running',
+    message: 'BloodBridge Server is running',
     timestamp: new Date().toISOString(),
   });
 });

@@ -1,81 +1,76 @@
 import { Schema, model, Document, Types } from 'mongoose';
-import { BLOOD_GROUPS, BloodGroup } from '../config/constants';
 
 export interface IBloodInventory extends Document {
-  facility: Types.ObjectId;
-  bloodGroup: BloodGroup;
-  totalUnits: number;
-  availableUnits: number;
-  reservedUnits: number;
-  units: Array<{
-    batchNumber: string;
-    collectionDate: Date;
-    expiryDate: Date;
-    quantity: number;
-    status: 'available' | 'reserved' | 'transferred' | 'expired';
-  }>;
+  hospitalId: Types.ObjectId;
+  bloodGroup: string;
+  units: number;
+  collectionDate: Date;
+  expiryDate: Date;
+  status: 'Available' | 'Reserved' | 'Expired';
   lastUpdated: Date;
-  criticalLevel: number;
-  lowLevel: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
 const bloodInventorySchema = new Schema<IBloodInventory>(
   {
-    facility: {
+    hospitalId: {
       type: Schema.Types.ObjectId,
       ref: 'Hospital',
-      required: true,
+      required: [true, 'Hospital ID is required'],
     },
     bloodGroup: {
       type: String,
-      enum: BLOOD_GROUPS,
-      required: true,
-    },
-    totalUnits: {
-      type: Number,
-      default: 0,
-    },
-    availableUnits: {
-      type: Number,
-      default: 0,
-    },
-    reservedUnits: {
-      type: Number,
-      default: 0,
-    },
-    units: [
-      {
-        batchNumber: { type: String, required: true },
-        collectionDate: { type: Date, required: true },
-        expiryDate: { type: Date, required: true },
-        quantity: { type: Number, required: true },
-        status: {
-          type: String,
-          enum: ['available', 'reserved', 'transferred', 'expired'],
-          default: 'available',
-        },
+      required: [true, 'Blood group is required'],
+      enum: {
+        values: ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'],
+        message: 'Invalid blood group',
       },
-    ],
+    },
+    units: {
+      type: Number,
+      required: [true, 'Units are required'],
+      min: [0, 'Units cannot be negative'],
+    },
+    collectionDate: {
+      type: Date,
+      required: [true, 'Collection date is required'],
+      default: Date.now,
+    },
+    expiryDate: {
+      type: Date,
+      required: [true, 'Expiry date is required'],
+    },
+    status: {
+      type: String,
+      enum: {
+        values: ['Available', 'Reserved', 'Expired'],
+        message: 'Status must be Available, Reserved, or Expired',
+      },
+      default: 'Available',
+    },
     lastUpdated: {
       type: Date,
       default: Date.now,
-    },
-    criticalLevel: {
-      type: Number,
-      default: 10,
-    },
-    lowLevel: {
-      type: Number,
-      default: 20,
     },
   },
   { timestamps: true }
 );
 
-// Indexes
-bloodInventorySchema.index({ facility: 1, bloodGroup: 1 });
-bloodInventorySchema.index({ 'units.expiryDate': 1 });
+// Pre-save hook to check if blood is expired
+bloodInventorySchema.pre('save', function (next) {
+  if (this.expiryDate < new Date()) {
+    this.status = 'Expired';
+  }
+  this.lastUpdated = new Date();
+  next();
+});
+
+// Indexes for efficient queries
+bloodInventorySchema.index({ hospitalId: 1, bloodGroup: 1 });
+bloodInventorySchema.index({ expiryDate: 1 });
+bloodInventorySchema.index({ bloodGroup: 1 });
+bloodInventorySchema.index({ status: 1 });
+bloodInventorySchema.index({ createdAt: -1 });
 
 export default model<IBloodInventory>('BloodInventory', bloodInventorySchema);

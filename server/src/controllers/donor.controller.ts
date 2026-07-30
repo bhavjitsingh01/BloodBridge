@@ -1,112 +1,404 @@
 import { Request, Response } from 'express';
-import { z } from 'zod';
-import { DonorService } from '../services/donor.service';
-import { sendSuccess, sendCreated } from '../utils/responses';
-import { asyncHandler } from '../middleware/errorHandler';
-import { BLOOD_GROUPS, BloodGroup } from '../config/constants';
+import Donor from '../models/Donor';
+import { getSocketService } from '../services/socket.service';
+import logger from '../utils/logger';
 
-const createDonorSchema = z.object({
-  bloodGroup: z.enum(BLOOD_GROUPS as unknown as [string, ...string[]]),
-  medicalHistory: z.object({
-    hasChronicDisease: z.boolean(),
-    diseaseDetails: z.string().optional(),
-    hemoglobin: z.number().min(0),
-    bloodPressure: z.string().optional(),
-  }),
-});
+interface AuthRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+  };
+}
 
-const updateDonorSchema = z.object({
-  bloodGroup: z.enum(BLOOD_GROUPS as unknown as [string, ...string[]]).optional(),
-  medicalHistory: z.any().optional(),
-  availabilityStatus: z.enum(['available', 'busy', 'not-available']).optional(),
-});
+// Create donor
+export const createDonor = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    // Only Donor and Admin roles can create
+    if (!['Admin', 'Donor'].includes(req.user?.role || '')) {
+      res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions',
+      });
+      return;
+    }
 
-export const donorController = {
-  /**
-   * Register donor
-   */
-  registerDonor: asyncHandler(async (req: Request, res: Response) => {
-    const validated = await createDonorSchema.parseAsync(req.body);
-    const donor = await DonorService.registerDonor({
-      userId: req.user!.id,
-      bloodGroup: validated.bloodGroup as BloodGroup,
-      medicalHistory: validated.medicalHistory,
+    const { fullName, email, phone, bloodGroup, age, gender, city, state, latitude, longitude } = req.body;
+
+    // Validate required fields
+    if (!fullName || !email || !phone || !bloodGroup || !age || !gender || !city || !state || latitude === undefined || longitude === undefined) {
+      res.status(400).json({
+        success: false,
+        message: 'All fields are required',
+      });
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid email format',
+      });
+      return;
+    }
+
+    // Validate age
+    if (age < 18 || age > 65) {
+      res.status(400).json({
+        success: false,
+        message: 'Age must be between 18 and 65',
+      });
+      return;
+    }
+
+    // Validate blood group
+    const validBloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+    if (!validBloodGroups.includes(bloodGroup)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid blood group',
+      });
+      return;
+    }
+
+    // Validate gender
+    if (!['Male', 'Female', 'Other'].includes(gender)) {
+      res.status(400).json({
+        success: false,
+        message: 'Gender must be Male, Female, or Other',
+      });
+      return;
+    }
+
+    // Check if donor already exists
+    const existingDonor = await Donor.findOne({ email: email.toLowerCase() });
+    if (existingDonor) {
+      res.status(409).json({
+        success: false,
+        message: 'Donor with this email already exists',
+      });
+      return;
+    }
+
+    const donor = new Donor({
+      fullName,
+      email: email.toLowerCase(),
+      phone,
+      bloodGroup,
+      age,
+      gender,
+      city,
+      state,
+      location: {
+        type: 'Point',
+        coordinates: [longitude, latitude],
+      },
     });
-    sendCreated(res, donor, 'Donor registered successfully');
-  }),
 
-  /**
-   * Get donor profile
-   */
-  getDonorProfile: asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const donor = await DonorService.getDonorProfile(id);
-    sendSuccess(res, donor, 'Donor profile retrieved successfully');
-  }),
+    await donor.save();
+    logger.info(`Donor created: ${email}`);
 
-  /**
-   * Get current donor profile
-   */
-  getCurrentDonorProfile: asyncHandler(async (req: Request, res: Response) => {
-    const donor = await DonorService.getDonorByUserId(req.user!.id);
-    sendSuccess(res, donor, 'Donor profile retrieved successfully');
-  }),
+    // Emit socket event for new donor available
+    try {
+      const socketService = getSocketService();
+      socketService.emitNewDonorAvailable(
+        donor._id.toString(),
+        bloodGroup,
+        fullName,
+        city,
+        state
+      );
+    } catch (socketError) {
+      logger.error('Error emitting socket event:', socketError);
+    }
 
-  /**
-   * Update donor profile
-   */
-  updateDonorProfile: asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const validated = await updateDonorSchema.parseAsync(req.body);
-    const donor = await DonorService.updateDonorProfile(id, {
-      ...validated,
-      bloodGroup: validated.bloodGroup ? (validated.bloodGroup as BloodGroup) : undefined,
+    res.status(201).json({
+      success: true,
+      message: 'Donor created successfully',
+      data: donor,
     });
-    sendSuccess(res, donor, 'Donor profile updated successfully');
-  }),
+  } catch (error) {
+    logger.error('Create donor error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create donor',
+    });
+  }
+};
 
-  /**
-   * Check donor eligibility
-   */
-  checkEligibility: asyncHandler(async (req: Request, res: Response) => {
+// Get all donors with pagination and search
+export const getDonors = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { page = 1, limit = 10, search, bloodGroup, city, state, availabilityStatus } = req.query;
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 10;
+
+    // Build filter
+    const filter: any = {};
+    if (search) {
+      filter.$or = [
+        { fullName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+      ];
+    }
+    if (bloodGroup) filter.bloodGroup = bloodGroup as string;
+    if (city) filter.city = { $regex: city as string, $options: 'i' };
+    if (state) filter.state = { $regex: state as string, $options: 'i' };
+    if (availabilityStatus) filter.availabilityStatus = availabilityStatus as string;
+
+    const total = await Donor.countDocuments(filter);
+    const donors = await Donor.find(filter)
+      .limit(limitNum)
+      .skip((pageNum - 1) * limitNum)
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      message: 'Donors retrieved successfully',
+      data: donors,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    logger.error('Get donors error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve donors',
+    });
+  }
+};
+
+// Get donor by ID
+export const getDonorById = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
     const { id } = req.params;
-    const eligibility = await DonorService.checkEligibility(id);
-    sendSuccess(res, eligibility, 'Eligibility check completed');
-  }),
 
-  /**
-   * Update availability status
-   */
-  updateAvailabilityStatus: asyncHandler(async (req: Request, res: Response) => {
+    const donor = await Donor.findById(id);
+    if (!donor) {
+      res.status(404).json({
+        success: false,
+        message: 'Donor not found',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Donor retrieved successfully',
+      data: donor,
+    });
+  } catch (error) {
+    logger.error('Get donor by ID error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve donor',
+    });
+  }
+};
+
+// Update donor
+export const updateDonor = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { fullName, email, phone, bloodGroup, age, gender, city, state, latitude, longitude } = req.body;
 
-    const donor = await DonorService.updateAvailabilityStatus(
-      id,
-      status as 'available' | 'busy' | 'not-available'
-    );
-    sendSuccess(res, donor, 'Availability status updated successfully');
-  }),
+    // Check authorization
+    if (req.user?.role !== 'Admin' && req.user?.role !== 'Donor') {
+      res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions',
+      });
+      return;
+    }
 
-  /**
-   * Get donation history
-   */
-  getDonationHistory: asyncHandler(async (req: Request, res: Response) => {
+    const donor = await Donor.findById(id);
+    if (!donor) {
+      res.status(404).json({
+        success: false,
+        message: 'Donor not found',
+      });
+      return;
+    }
+
+    // Update fields
+    if (fullName) donor.fullName = fullName;
+    if (email) {
+      const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+      if (!emailRegex.test(email)) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid email format',
+        });
+        return;
+      }
+      donor.email = email.toLowerCase();
+    }
+    if (phone) donor.phone = phone;
+    if (bloodGroup) {
+      const validBloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+      if (!validBloodGroups.includes(bloodGroup)) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid blood group',
+        });
+        return;
+      }
+      donor.bloodGroup = bloodGroup;
+    }
+    if (age) {
+      if (age < 18 || age > 65) {
+        res.status(400).json({
+          success: false,
+          message: 'Age must be between 18 and 65',
+        });
+        return;
+      }
+      donor.age = age;
+    }
+    if (gender) {
+      if (!['Male', 'Female', 'Other'].includes(gender)) {
+        res.status(400).json({
+          success: false,
+          message: 'Gender must be Male, Female, or Other',
+        });
+        return;
+      }
+      donor.gender = gender;
+    }
+    if (city) donor.city = city;
+    if (state) donor.state = state;
+    if (latitude !== undefined && longitude !== undefined) {
+      donor.location = {
+        type: 'Point',
+        coordinates: [longitude, latitude],
+      };
+    }
+
+    await donor.save();
+    logger.info(`Donor updated: ${id}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Donor updated successfully',
+      data: donor,
+    });
+  } catch (error) {
+    logger.error('Update donor error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update donor',
+    });
+  }
+};
+
+// Update donor availability
+export const updateDonorAvailability = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
     const { id } = req.params;
-    const { page = '1', limit = '20' } = req.query;
+    const { availabilityStatus } = req.body;
 
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
-    const history = await DonorService.getDonationHistory(id, skip, parseInt(limit as string));
+    // Check authorization
+    if (req.user?.role !== 'Admin' && req.user?.role !== 'Donor') {
+      res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions',
+      });
+      return;
+    }
 
-    sendSuccess(res, history, 'Donation history retrieved successfully');
-  }),
+    // Validate availability status
+    if (!['Available', 'Unavailable'].includes(availabilityStatus)) {
+      res.status(400).json({
+        success: false,
+        message: 'Availability status must be Available or Unavailable',
+      });
+      return;
+    }
 
-  /**
-   * Get eligible donors for blood group
-   */
-  getEligibleDonorsForBloodGroup: asyncHandler(async (req: Request, res: Response) => {
-    const { bloodGroup } = req.params;
-    const donors = await DonorService.getEligibleDonorsForBloodGroup(bloodGroup as any);
-    sendSuccess(res, donors, 'Eligible donors retrieved successfully');
-  }),
+    const donor = await Donor.findById(id);
+    if (!donor) {
+      res.status(404).json({
+        success: false,
+        message: 'Donor not found',
+      });
+      return;
+    }
+
+    donor.availabilityStatus = availabilityStatus;
+    await donor.save();
+    logger.info(`Donor availability updated: ${id} - ${availabilityStatus}`);
+
+    // Emit socket event for donor availability change
+    try {
+      const socketService = getSocketService();
+      socketService.emitDonorAvailabilityChanged(
+        donor._id.toString(),
+        donor.bloodGroup,
+        donor.fullName,
+        availabilityStatus as 'Available' | 'Unavailable',
+        donor.city,
+        donor.state
+      );
+    } catch (socketError) {
+      logger.error('Error emitting socket event:', socketError);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Donor availability updated successfully',
+      data: donor,
+    });
+  } catch (error) {
+    logger.error('Update donor availability error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update donor availability',
+    });
+  }
+};
+
+// Delete donor
+export const deleteDonor = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    // Check authorization
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({
+        success: false,
+        message: 'Only admins can delete donors',
+      });
+      return;
+    }
+
+    const donor = await Donor.findByIdAndDelete(id);
+    if (!donor) {
+      res.status(404).json({
+        success: false,
+        message: 'Donor not found',
+      });
+      return;
+    }
+
+    logger.info(`Donor deleted: ${id}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Donor deleted successfully',
+      data: donor,
+    });
+  } catch (error) {
+    logger.error('Delete donor error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete donor',
+    });
+  }
 };

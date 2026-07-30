@@ -26,7 +26,7 @@ export async function connectDatabase(): Promise<Connection> {
 
     connection = mongooseConnection.connection;
 
-    logger.info('MongoDB connected successfully');
+    logger.info('MongoDB Connected');
 
     // Set up connection event handlers
     connection.on('disconnected', () => {

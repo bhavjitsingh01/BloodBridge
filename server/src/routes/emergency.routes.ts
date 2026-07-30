@@ -1,13 +1,26 @@
 import { Router } from 'express';
-import { emergencyController } from '../controllers/emergency.controller';
+import {
+  createEmergencyRequest,
+  getEmergencyRequests,
+  getEmergencyRequestById,
+  updateEmergencyStatus,
+  deleteEmergencyRequest,
+  executeEmergencyMatching,
+} from '../controllers/emergency.controller';
 import { authMiddleware } from '../middleware/auth';
-import { authorize } from '../middleware/authorization';
 
 const router = Router();
 
-router.post('/', authMiddleware, authorize('hospital'), emergencyController.createEmergencyRequest);
-router.get('/', emergencyController.getActiveEmergencies);
-router.get('/:id', emergencyController.getEmergencyRequest);
-router.post('/:id/resolve', authMiddleware, authorize('hospital', 'blood-bank', 'admin'), emergencyController.resolveEmergency);
+// Public routes
+router.get('/', getEmergencyRequests);
+router.get('/:id', getEmergencyRequestById);
+
+// Protected routes
+router.post('/', authMiddleware, createEmergencyRequest);
+router.patch('/:id/status', authMiddleware, updateEmergencyStatus);
+router.delete('/:id', authMiddleware, deleteEmergencyRequest);
+
+// Matching endpoint
+router.post('/matching/:requestId', authMiddleware, executeEmergencyMatching);
 
 export default router;
