@@ -61,19 +61,33 @@ export default function AdminAnalytics() {
 
       setHospitalData(hospitals || [])
       setBloodBankData(bloodBanks || [])
-      setInventoryData(inventory || [])
       setEmergencyData(emergencyRequests || [])
 
-      const totalInventory = (inventory || []).reduce((sum: number, inv: any) => sum + (inv.available || 0), 0)
-      const bloodGroupStats = (inventory || []).reduce((acc: any, inv: any) => {
+      // Map API response to component interface
+      const mappedInventory = (inventory || []).map((item: any) => ({
+        id: item._id || item.id || '',
+        _id: item._id,
+        bloodGroup: item.bloodGroup || '',
+        total: item.units || 0,
+        available: item.units || 0,
+        reserved: item.reserved || 0,
+        expiring: item.expiring || 0,
+        expiryDate: item.expiryDate,
+        status: item.status || 'Available'
+      }))
+
+      setInventoryData(mappedInventory)
+
+      const totalInventory = mappedInventory.reduce((sum: number, inv: any) => sum + (inv.available || 0), 0)
+      const bloodGroupStats = mappedInventory.reduce((acc: any, inv: any) => {
         acc[inv.bloodGroup] = (acc[inv.bloodGroup] || 0) + (inv.available || 0)
         return acc
       }, {})
 
       const inventoryByStatus = {
-        critical: (inventory || []).filter((inv: any) => (inv.available || 0) < 5).length,
-        low: (inventory || []).filter((inv: any) => (inv.available || 0) >= 5 && (inv.available || 0) < 15).length,
-        stable: (inventory || []).filter((inv: any) => (inv.available || 0) >= 15).length,
+        critical: mappedInventory.filter((inv: any) => (inv.available || 0) < 5).length,
+        low: mappedInventory.filter((inv: any) => (inv.available || 0) >= 5 && (inv.available || 0) < 15).length,
+        stable: mappedInventory.filter((inv: any) => (inv.available || 0) >= 15).length,
       }
 
       const emergencyCount = (emergencyRequests || []).filter((req: any) => req.status !== 'completed').length

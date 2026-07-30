@@ -42,7 +42,20 @@ export default function HospitalAnalytics() {
         apiClient.getPredictions().catch(() => null),
       ])
 
-      setInventory(inventoryRes.data || [])
+      // Map API response to component interface
+      const mappedInventory = (inventoryRes.data || []).map((item: any) => ({
+        id: item._id || item.id || '',
+        _id: item._id,
+        bloodGroup: item.bloodGroup || '',
+        total: item.units || 0,
+        available: item.units || 0,
+        reserved: item.reserved || 0,
+        expiring: item.expiring || 0,
+        expiryDate: item.expiryDate,
+        status: item.status || 'Available'
+      }))
+
+      setInventory(mappedInventory)
       setRequests(requestsRes.data || [])
       setPredictions(predictionsRes)
     } catch (err: any) {
