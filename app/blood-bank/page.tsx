@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Droplets, TrendingUp, Clock, AlertCircle, Send, Truck, Heart, Loader } from 'lucide-react'
 import DashboardLayout from '@/components/DashboardLayout'
 import StatCard from '@/components/StatCard'
@@ -20,7 +21,36 @@ const navItems = [
 
 export default function BloodBankDashboard() {
   const { user } = useAuth()
-  const { data, loading, error } = useBloodBankDashboardData()
+  const { data, loading, error, refetch } = useBloodBankDashboardData()
+  const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+
+  const handleAcceptRequest = async (requestId: string) => {
+    try {
+      const { dashboardHandlers } = await import('@/lib/dashboardHandlers')
+      await dashboardHandlers.acceptEmergencyRequest(requestId)
+      setSubmitMessage({ type: 'success', text: 'Request accepted successfully!' })
+      setTimeout(() => {
+        refetch()
+        setSubmitMessage(null)
+      }, 1000)
+    } catch (err: any) {
+      setSubmitMessage({ type: 'error', text: err.message || 'Failed to accept request' })
+    }
+  }
+
+  const handleDeleteRequest = async (requestId: string) => {
+    try {
+      const { dashboardHandlers } = await import('@/lib/dashboardHandlers')
+      await dashboardHandlers.deleteEmergencyRequest(requestId)
+      setSubmitMessage({ type: 'success', text: 'Request deleted successfully!' })
+      setTimeout(() => {
+        refetch()
+        setSubmitMessage(null)
+      }, 1000)
+    } catch (err: any) {
+      setSubmitMessage({ type: 'error', text: err.message || 'Failed to delete request' })
+    }
+  }
 
   if (loading) {
     return (
@@ -70,6 +100,16 @@ export default function BloodBankDashboard() {
       userRole="Blood Bank Manager"
       navItems={navItems}
     >
+      {/* Submit Message Alert */}
+      {submitMessage && (
+        <Alert
+          type={submitMessage.type}
+          title={submitMessage.type === 'success' ? 'Success' : 'Error'}
+          message={submitMessage.text}
+          className="mb-6"
+        />
+      )}
+
       {/* Critical Alert */}
       {criticalItems > 0 && (
         <Alert
@@ -213,7 +253,14 @@ export default function BloodBankDashboard() {
                     </div>
                   </div>
                   {req.status !== 'completed' && (
-                    <Button size="sm">Accept</Button>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => handleAcceptRequest(req._id || req.id)}>
+                        Accept
+                      </Button>
+                      <Button size="sm" variant="danger" onClick={() => handleDeleteRequest(req._id || req.id)}>
+                        Delete
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
