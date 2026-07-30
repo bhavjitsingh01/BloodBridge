@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Heart, Bell, MapPin, History, AlertCircle, CheckCircle, Clock, Loader } from 'lucide-react'
+import { Heart, Bell, MapPin, History, AlertCircle, CheckCircle, Clock, Loader, Edit2 } from 'lucide-react'
 import DashboardLayout from '@/components/DashboardLayout'
 import StatCard from '@/components/StatCard'
 import Card from '@/components/Card'
 import Table from '@/components/Table'
 import Badge from '@/components/Badge'
 import Alert from '@/components/Alert'
+import Button from '@/components/Button'
 import { useDonorDashboardData } from '@/lib/useDashboardData'
 import { useAuth } from '@/lib/useAuth'
 
@@ -19,17 +20,62 @@ const navItems = [
 
 export default function DonorDashboard() {
   const { user } = useAuth()
-  const { data, loading, error } = useDonorDashboardData()
+  const { data, loading, error, refetch } = useDonorDashboardData()
   const [daysSinceLastDonation, setDaysSinceLastDonation] = useState(0)
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [formData, setFormData] = useState({
+    fullName: user?.name || '',
+    bloodGroup: (user as any)?.bloodGroup || 'O+',
+    age: (user as any)?.age || 25,
+    gender: (user as any)?.gender || 'Male',
+    city: (user as any)?.city || '',
+    state: (user as any)?.state || '',
+    phone: (user as any)?.phone || '',
+    availabilityStatus: (user as any)?.availabilityStatus || 'Available',
+  })
 
   useEffect(() => {
-    if (user?.lastDonation) {
-      const lastDonationDate = new Date(user.lastDonation).getTime()
-      const currentDate = new Date().getTime()
-      const days = Math.floor((currentDate - lastDonationDate) / (1000 * 60 * 60 * 24))
-      setDaysSinceLastDonation(days)
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        fullName: user.name || prev.fullName,
+        bloodGroup: (user as any)?.bloodGroup || prev.bloodGroup,
+        city: (user as any)?.city || prev.city,
+        phone: (user as any)?.phone || prev.phone,
+      }))
+
+      if ((user as any)?.lastDonation) {
+        const lastDonationDate = new Date((user as any).lastDonation).getTime()
+        const currentDate = new Date().getTime()
+        const days = Math.floor((currentDate - lastDonationDate) / (1000 * 60 * 60 * 24))
+        setDaysSinceLastDonation(days)
+      }
     }
-  }, [user?.lastDonation])
+  }, [user])
+
+  const handleSaveDonorData = async () => {
+    setIsSubmitting(true)
+    try {
+      const { apiClient } = await import('@/lib/api')
+      if (user?.id) {
+        await apiClient.updateDonor(user.id, formData)
+      } else {
+        await apiClient.createDonor(formData)
+      }
+      setSubmitMessage({ type: 'success', text: 'Donor profile updated successfully!' })
+      setShowEditForm(false)
+      setTimeout(() => {
+        refetch()
+        setSubmitMessage(null)
+      }, 1000)
+    } catch (err: any) {
+      setSubmitMessage({ type: 'error', text: err.message || 'Failed to save donor data' })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -84,12 +130,22 @@ export default function DonorDashboard() {
       userRole="Blood Donor"
       navItems={navItems}
     >
+      {/* Submit Message Alert */}
+      {submitMessage && (
+        <Alert
+          type={submitMessage.type}
+          title={submitMessage.type === 'success' ? 'Success' : 'Error'}
+          message={submitMessage.text}
+          className="mb-6"
+        />
+      )}
+
       {/* Profile Alert */}
-      {user?.availabilityStatus !== 'Available' && (
+      {user && (user as any)?.availabilityStatus !== 'Available' && (
         <Alert
           type="warning"
           title="Availability Status"
-          message={`Your current status is: ${user?.availabilityStatus}`}
+          message={`Your current status is: ${(user as any)?.availabilityStatus}`}
           className="mb-6"
         />
       )}
@@ -98,14 +154,14 @@ export default function DonorDashboard() {
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Blood Group"
-          value={user?.bloodGroup || 'N/A'}
+          value={formData.bloodGroup || 'N/A'}
           icon={<Heart className="h-6 w-6" />}
           color="blood"
         />
         <StatCard
           label="Days Since Last Donation"
-          value={daysSinceLastDonation}
-          unit="days"
+          value={daysSinceLastDonation || '-'}
+          unit={daysSinceLastDonation ? 'days' : ''}
           icon={<Clock className="h-6 w-6" />}
           color="blue"
         />
@@ -117,31 +173,131 @@ export default function DonorDashboard() {
         />
       </div>
 
-      {/* Availability Status Section */}
-      <Card className="mb-8 border-l-4 border-l-blue-500">
-        <div className="flex items-start gap-4">
-          <div className="flex-shrink-0 rounded-full bg-blue-100 p-3">
-            <AlertCircle className="h-6 w-6 text-blue-600" />
-          </div>
+      {/* Profile Section with Edit Button */}
+      <Card className="mb-8 border-l-4 border-l-blood-500">
+        <div className="flex items-start justify-between">
           <div className="flex-1">
-            <h2 className="text-lg font-semibold text-gray-900">Availability Status</h2>
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Current Status:</span>
-                <Badge variant={user?.availabilityStatus === 'Available' ? 'success' : 'warning'}>
-                  {user?.availabilityStatus || 'N/A'}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Location:</span>
-                <span className="font-medium text-gray-900">{user?.location || 'N/A'}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Contact:</span>
-                <span className="font-medium text-gray-900">{user?.phone || user?.email}</span>
-              </div>
+            <div className="flex items-center gap-3 mb-4">
+              <Heart className="h-6 w-6 text-blood-600" />
+              <h2 className="text-lg font-semibold text-gray-900">Donor Profile</h2>
             </div>
+            {!showEditForm ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <p className="text-xs font-semibold text-gray-500">Name</p>
+                    <p className="mt-1 font-medium text-gray-900">{formData.fullName || 'Not specified'}</p>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <p className="text-xs font-semibold text-gray-500">Blood Group</p>
+                    <p className="mt-1 text-2xl font-bold text-blood-600">{formData.bloodGroup}</p>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <p className="text-xs font-semibold text-gray-500">City</p>
+                    <p className="mt-1 font-medium text-gray-900">{formData.city || 'Not specified'}</p>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <p className="text-xs font-semibold text-gray-500">Phone</p>
+                    <p className="mt-1 font-medium text-gray-900">{formData.phone || 'Not specified'}</p>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <p className="text-xs font-semibold text-gray-500">Gender</p>
+                    <p className="mt-1 font-medium text-gray-900">{formData.gender}</p>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <p className="text-xs font-semibold text-gray-500">Status</p>
+                    <Badge variant={formData.availabilityStatus === 'Available' ? 'success' : 'warning'}>
+                      {formData.availabilityStatus}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Full Name</label>
+                    <input
+                      type="text"
+                      value={formData.fullName}
+                      onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Blood Group</label>
+                    <select
+                      value={formData.bloodGroup}
+                      onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value })}
+                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+                      disabled={isSubmitting}
+                    >
+                      {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((bg) => (
+                        <option key={bg} value={bg}>{bg}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Age</label>
+                    <input
+                      type="number"
+                      value={formData.age}
+                      onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value) })}
+                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Gender</label>
+                    <select
+                      value={formData.gender}
+                      onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+                      disabled={isSubmitting}
+                    >
+                      <option>Male</option>
+                      <option>Female</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">City</label>
+                    <input
+                      type="text"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Phone</label>
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <Button size="sm" onClick={handleSaveDonorData} disabled={isSubmitting}>
+                    {isSubmitting ? 'Saving...' : 'Save Profile'}
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => setShowEditForm(false)} disabled={isSubmitting}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
+          {!showEditForm && (
+            <Button size="sm" variant="secondary" onClick={() => setShowEditForm(true)} className="ml-4">
+              <Edit2 className="h-4 w-4" /> Edit
+            </Button>
+          )}
         </div>
       </Card>
 

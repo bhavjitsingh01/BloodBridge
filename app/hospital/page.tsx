@@ -24,6 +24,8 @@ export default function HospitalDashboard() {
   const { data, loading, error, refetch } = useHospitalDashboardData()
   const [requestForm, setRequestForm] = useState({ bloodGroup: 'O+', units: 5, priority: 'Normal' })
   const [showRequestForm, setShowRequestForm] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
   if (loading) {
     return (
@@ -67,9 +69,42 @@ export default function HospitalDashboard() {
   const totalReserved = inventory.reduce((sum, inv) => sum + (inv.reserved || 0), 0)
   const totalExpiring = inventory.reduce((sum, inv) => sum + (inv.expiring || 0), 0)
 
-  const handleRequestSubmit = () => {
-    setShowRequestForm(false)
-    setRequestForm({ bloodGroup: 'O+', units: 5, priority: 'Normal' })
+  const handleRequestSubmit = async () => {
+    setIsSubmitting(true)
+    try {
+      const { apiClient } = await import('@/lib/api')
+      await apiClient.createEmergencyRequest({
+        bloodGroup: requestForm.bloodGroup,
+        unitsNeeded: requestForm.units,
+        priority: requestForm.priority,
+        status: 'Pending',
+      })
+      setSubmitMessage({ type: 'success', text: 'Blood request submitted successfully!' })
+      setShowRequestForm(false)
+      setRequestForm({ bloodGroup: 'O+', units: 5, priority: 'Normal' })
+      setTimeout(() => {
+        refetch()
+        setSubmitMessage(null)
+      }, 1000)
+    } catch (err: any) {
+      setSubmitMessage({ type: 'error', text: err.message || 'Failed to submit request' })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleFulfillRequest = async (requestId: string) => {
+    try {
+      const { apiClient } = await import('@/lib/api')
+      await apiClient.updateEmergencyStatus(requestId, 'Fulfilled')
+      setSubmitMessage({ type: 'success', text: 'Request fulfilled successfully!' })
+      setTimeout(() => {
+        refetch()
+        setSubmitMessage(null)
+      }, 1000)
+    } catch (err: any) {
+      setSubmitMessage({ type: 'error', text: err.message || 'Failed to fulfill request' })
+    }
   }
 
   return (
@@ -79,6 +114,16 @@ export default function HospitalDashboard() {
       userRole="Hospital Admin"
       navItems={navItems}
     >
+      {/* Submit Message Alert */}
+      {submitMessage && (
+        <Alert
+          type={submitMessage.type}
+          title={submitMessage.type === 'success' ? 'Success' : 'Error'}
+          message={submitMessage.text}
+          className="mb-6"
+        />
+      )}
+
       {/* Critical Alert */}
       {totalExpiring > 0 && (
         <Alert
@@ -199,10 +244,18 @@ export default function HospitalDashboard() {
               </div>
             </div>
             <div className="flex gap-3">
-              <Button size="sm" onClick={handleRequestSubmit}>
-                <Send className="mr-2 h-4 w-4" /> Submit Request
+              <Button size="sm" onClick={handleRequestSubmit} disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <Loader className="h-4 w-4 animate-spin" /> Submitting...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Send className="h-4 w-4" /> Submit Request
+                  </span>
+                )}
               </Button>
-              <Button size="sm" variant="secondary" onClick={() => setShowRequestForm(false)}>
+              <Button size="sm" variant="secondary" onClick={() => setShowRequestForm(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
             </div>
@@ -241,7 +294,7 @@ export default function HospitalDashboard() {
                       </div>
                     </div>
                   </div>
-                  <Button size="sm" variant="danger">
+                  <Button size="sm" variant="danger" onClick={() => handleFulfillRequest(req._id || req.id)}>
                     Fulfill
                   </Button>
                 </div>
