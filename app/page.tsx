@@ -158,9 +158,6 @@ export default function Home() {
                 {landingData.hero.cta}
                 <ArrowRight className="h-5 w-5" />
               </Link>
-              <button className="rounded-lg border-2 border-blood-600 px-8 py-4 font-semibold text-blood-600 transition-all hover:bg-blood-50">
-                {landingData.hero.secondaryCta}
-              </button>
             </div>
 
             {/* Stats Preview */}
@@ -474,9 +471,6 @@ export default function Home() {
               Get Started Now
               <ArrowRight className="h-5 w-5" />
             </Link>
-            <button className="rounded-lg border-2 border-blood-600 px-8 py-4 font-semibold text-blood-600 transition-all hover:bg-blood-50">
-              Schedule a Demo
-            </button>
           </div>
         </div>
       </section>
