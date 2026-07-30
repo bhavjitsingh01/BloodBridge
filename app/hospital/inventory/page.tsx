@@ -52,7 +52,19 @@ export default function HospitalInventory() {
       setLoading(true)
       setError(null)
       const result = await apiClient.getInventory({ limit: 100 })
-      setInventory(result.data || [])
+      // Map API response to component interface
+      const mappedInventory = (result.data || []).map((item: any) => ({
+        id: item._id || item.id || '',
+        _id: item._id,
+        bloodGroup: item.bloodGroup || '',
+        total: item.units || 0,
+        available: item.units || 0,
+        reserved: item.reserved || 0,
+        expiring: item.expiring || 0,
+        expiryDate: item.expiryDate,
+        status: item.status || 'Available'
+      }))
+      setInventory(mappedInventory)
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to load inventory')
     } finally {
